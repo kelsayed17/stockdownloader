@@ -1,3 +1,4 @@
+// Java
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
@@ -13,13 +14,19 @@ import java.util.Calendar;
 import java.util.List;
 import java.util.TreeSet;
 
+// Apache
 import org.apache.commons.io.FileUtils;
+
+// Jsoup
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 
+// Google
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ListMultimap;
+
+// opencsv
 import com.opencsv.CSVParser;
 import com.opencsv.CSVParserBuilder;
 import com.opencsv.CSVReader;
