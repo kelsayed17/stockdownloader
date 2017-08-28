@@ -33,25 +33,25 @@ public class YahooFinanceData {
 	private boolean error;
 
 	public YahooFinanceData() {
-		priceSales			= new BigDecimal("0.00");
-		trailingAnnualDividendYield	= new BigDecimal("0.00");
-		dilutedEPS			= new BigDecimal("0.00");
-		EPSEstimateNextYear	= new BigDecimal("0.00");
-		lastTradePriceOnly	= new BigDecimal("0.00");
-		yearHigh				= new BigDecimal("0.00");
-		yearLow						= new BigDecimal("0.00");
-		fiftydayMovingAverage		= new BigDecimal("0.00");
-		twoHundreddayMovingAverage	= new BigDecimal("0.00");
-		previousCloseOne			= new BigDecimal("0.00");
-		open						= new BigDecimal("0.00");
-		daysHigh					= new BigDecimal("0.00");
-		daysLow					= new BigDecimal("0.00");
-		volume					= new BigDecimal("0.00");
-		yearRange				= "";
-		marketCapitalizationStr		= "";
-		marketCapitalization			= 0;
-		incomplete					= false;
-		error						= false;
+		priceSales = new BigDecimal("0.00");
+		trailingAnnualDividendYield = new BigDecimal("0.00");
+		dilutedEPS = new BigDecimal("0.00");
+		EPSEstimateNextYear = new BigDecimal("0.00");
+		lastTradePriceOnly = new BigDecimal("0.00");
+		yearHigh = new BigDecimal("0.00");
+		yearLow = new BigDecimal("0.00");
+		fiftydayMovingAverage = new BigDecimal("0.00");
+		twoHundreddayMovingAverage = new BigDecimal("0.00");
+		previousCloseOne = new BigDecimal("0.00");
+		open = new BigDecimal("0.00");
+		daysHigh = new BigDecimal("0.00");
+		daysLow = new BigDecimal("0.00");
+		volume = new BigDecimal("0.00");
+		yearRange = "";
+		marketCapitalizationStr = "";
+		marketCapitalization = 0;
+		incomplete = false;
+		error = false;
 	}
 
 	public void downloadYahooFinance(String ticker) {
