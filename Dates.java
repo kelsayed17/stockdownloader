@@ -104,11 +104,11 @@ public class Dates {
         if (dateYesterday.get(Calendar.DAY_OF_WEEK) == Calendar.SATURDAY)
             yesterdayMarket.add(Calendar.DAY_OF_MONTH, -3);
 
-            // Adjust if yesterday is Sunday
+        // Adjust if yesterday is Sunday
         else if (dateYesterday.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY)
             yesterdayMarket.add(Calendar.DAY_OF_MONTH, -4);
 
-            // Default setting
+        // Default setting
         else
             yesterdayMarket.add(Calendar.DAY_OF_MONTH, -1);
 
@@ -124,11 +124,11 @@ public class Dates {
         if (dateTomorrow.get(Calendar.DAY_OF_WEEK) == Calendar.SATURDAY)
             tomorrowMarket.add(Calendar.DAY_OF_MONTH, 3);
 
-            // Adjust if tomorrow is Sunday
+        // Adjust if tomorrow is Sunday
         else if (dateTomorrow.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY)
             tomorrowMarket.add(Calendar.DAY_OF_MONTH, 2);
 
-            // Default setting
+        // Default setting
         else
             tomorrowMarket.add(Calendar.DAY_OF_MONTH, 1);
 
@@ -137,7 +137,6 @@ public class Dates {
         today = dateFormat.format(todayMarket.getTime());
         tomorrow = dateFormat.format(tomorrowMarket.getTime());
         custom = dateFormat.format(dateCustom.getTime());
-
 
         fiscalQtr1Str = "03/28/2016";
         fiscalQtr2Str = "06/28/2016";
@@ -154,7 +153,6 @@ public class Dates {
         fromDate.setTime(dateFormat.parse(custom));
         toDate.setTime(dateFormat.parse(today));
     }
-
 
     public Calendar getDateToday() {
         return dateToday;
