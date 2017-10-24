@@ -33,25 +33,25 @@ public class YahooFinanceData {
 	private boolean error;
 
 	public YahooFinanceData() {
-		priceSales = new BigDecimal("0.00");
-		trailingAnnualDividendYield = new BigDecimal("0.00");
-		dilutedEPS = new BigDecimal("0.00");
-		EPSEstimateNextYear = new BigDecimal("0.00");
-		lastTradePriceOnly = new BigDecimal("0.00");
-		yearHigh = new BigDecimal("0.00");
-		yearLow = new BigDecimal("0.00");
-		fiftydayMovingAverage = new BigDecimal("0.00");
-		twoHundreddayMovingAverage = new BigDecimal("0.00");
-		previousCloseOne = new BigDecimal("0.00");
-		open = new BigDecimal("0.00");
-		daysHigh = new BigDecimal("0.00");
-		daysLow = new BigDecimal("0.00");
-		volume = new BigDecimal("0.00");
-		yearRange = "";
-		marketCapitalizationStr = "";
-		marketCapitalization = 0;
-		incomplete = false;
-		error = false;
+		priceSales					= new BigDecimal("0.00");
+		trailingAnnualDividendYield	= new BigDecimal("0.00");
+		dilutedEPS					= new BigDecimal("0.00");
+		EPSEstimateNextYear			= new BigDecimal("0.00");
+		lastTradePriceOnly			= new BigDecimal("0.00");
+		yearHigh					= new BigDecimal("0.00");
+		yearLow						= new BigDecimal("0.00");
+		fiftydayMovingAverage		= new BigDecimal("0.00");
+		twoHundreddayMovingAverage	= new BigDecimal("0.00");
+		previousCloseOne			= new BigDecimal("0.00");
+		open						= new BigDecimal("0.00");
+		daysHigh					= new BigDecimal("0.00");
+		daysLow						= new BigDecimal("0.00");
+		volume						= new BigDecimal("0.00");
+		yearRange					= "";
+		marketCapitalizationStr		= "";
+		marketCapitalization		= 0;
+		incomplete					= false;
+		error						= false;
 	}
 
 	public void downloadYahooFinance(String ticker) {
@@ -77,20 +77,20 @@ public class YahooFinanceData {
 
 		String [] nextLine;
 		while ((nextLine = reader.readNext()) != null) {
-			String priceSalesStr						= nextLine[tags.indexOf("p5") / 2];
+			String priceSalesStr					= nextLine[tags.indexOf("p5") / 2];
 			String trailingAnnualDividendYieldStr	= nextLine[tags.indexOf("d0") / 2];
-			String dilutedEPSStr						= nextLine[tags.indexOf("e0") / 2];
+			String dilutedEPSStr					= nextLine[tags.indexOf("e0") / 2];
 			String EPSEstimateNextYearStr			= nextLine[tags.indexOf("e8") / 2];
-			String lastTradePriceOnlyStr				= nextLine[tags.indexOf("l1") / 2];
+			String lastTradePriceOnlyStr			= nextLine[tags.indexOf("l1") / 2];
 			String yearHighStr						= nextLine[tags.indexOf("k0") / 2];
 			String yearLowStr						= nextLine[tags.indexOf("j0") / 2];
 			String fiftydayMovingAverageStr			= nextLine[tags.indexOf("m3") / 2];
-			String twoHundreddayMovingAverageStr		= nextLine[tags.indexOf("m4") / 2];
+			String twoHundreddayMovingAverageStr	= nextLine[tags.indexOf("m4") / 2];
 			String previousCloseOneStr				= nextLine[tags.indexOf("p0") / 2];
 			String openStr							= nextLine[tags.indexOf("o0") / 2];
 			String daysHighStr						= nextLine[tags.indexOf("h0") / 2];
 			String daysLowStr						= nextLine[tags.indexOf("g0") / 2];
-			String volumeStr							= nextLine[tags.indexOf("v0") / 2];
+			String volumeStr						= nextLine[tags.indexOf("v0") / 2];
 			yearRange								= nextLine[tags.indexOf("w0") / 2];
 			marketCapitalizationStr					= nextLine[tags.indexOf("j1") / 2];
 
@@ -99,13 +99,13 @@ public class YahooFinanceData {
 			dilutedEPS					= new BigDecimal((dilutedEPSStr.equals("N/A") ? "0" : dilutedEPSStr));
 			EPSEstimateNextYear			= new BigDecimal((EPSEstimateNextYearStr.equals("N/A") ? "0" : EPSEstimateNextYearStr));
 			lastTradePriceOnly			= new BigDecimal((lastTradePriceOnlyStr.equals("N/A") ? "0" : lastTradePriceOnlyStr));
-			yearHigh						= new BigDecimal((yearHighStr.equals("N/A") ? "0" : yearHighStr));
+			yearHigh					= new BigDecimal((yearHighStr.equals("N/A") ? "0" : yearHighStr));
 			yearLow						= new BigDecimal((yearLowStr.equals("N/A") ? "0" : yearLowStr));
 			fiftydayMovingAverage		= new BigDecimal((fiftydayMovingAverageStr.equals("N/A") ? "0" : fiftydayMovingAverageStr));
 			twoHundreddayMovingAverage	= new BigDecimal((twoHundreddayMovingAverageStr.equals("N/A") ? "0" : twoHundreddayMovingAverageStr));
-			previousCloseOne				= new BigDecimal((previousCloseOneStr.equals("N/A") ? "0" : previousCloseOneStr));
-			open							= new BigDecimal((openStr.equals("N/A") ? "0" : openStr));
-			daysHigh						= new BigDecimal((daysHighStr.equals("N/A") ? "0" : daysHighStr));
+			previousCloseOne			= new BigDecimal((previousCloseOneStr.equals("N/A") ? "0" : previousCloseOneStr));
+			open						= new BigDecimal((openStr.equals("N/A") ? "0" : openStr));
+			daysHigh					= new BigDecimal((daysHighStr.equals("N/A") ? "0" : daysHighStr));
 			daysLow						= new BigDecimal((daysLowStr.equals("N/A") ? "0" : daysLowStr));
 			volume						= new BigDecimal((volumeStr.equals("N/A") ? "0" : volumeStr));
 
