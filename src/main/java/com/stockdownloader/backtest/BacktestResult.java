@@ -16,7 +16,6 @@ import java.util.Objects;
  */
 public final class BacktestResult {
 
-    private static final int TRADING_DAYS_PER_YEAR = 252;
     private static final BigDecimal HUNDRED = BigDecimal.valueOf(100);
 
     private final String strategyName;
@@ -52,10 +51,10 @@ public final class BacktestResult {
         return finalCapital.subtract(initialCapital);
     }
 
-    public long getTotalTrades() { return closedTrades().size(); }
+    public long getTotalTrades() { return getClosedTrades().size(); }
 
     public long getWinningTrades() {
-        return closedTrades().stream().filter(Trade::isWin).count();
+        return getClosedTrades().stream().filter(Trade::isWin).count();
     }
 
     public long getLosingTrades() { return getTotalTrades() - getWinningTrades(); }
@@ -77,7 +76,7 @@ public final class BacktestResult {
     }
 
     private BigDecimal averageProfitLoss(boolean winners) {
-        var filtered = closedTrades().stream()
+        var filtered = getClosedTrades().stream()
                 .filter(t -> t.isWin() == winners)
                 .map(Trade::getProfitLoss)
                 .toList();
@@ -89,7 +88,7 @@ public final class BacktestResult {
     public BigDecimal getProfitFactor() {
         BigDecimal grossProfit = BigDecimal.ZERO;
         BigDecimal grossLoss = BigDecimal.ZERO;
-        for (Trade t : closedTrades()) {
+        for (Trade t : getClosedTrades()) {
             if (t.isWin()) {
                 grossProfit = grossProfit.add(t.getProfitLoss());
             } else {
@@ -158,58 +157,7 @@ public final class BacktestResult {
                 .multiply(HUNDRED);
     }
 
-    public void printReport(List<PriceData> data) {
-        String separator = "=".repeat(70);
-        String thinSep = "-".repeat(70);
-
-        System.out.println();
-        System.out.println(separator);
-        System.out.println("  BACKTEST REPORT: " + strategyName);
-        System.out.println(separator);
-        System.out.println();
-        System.out.println("  Period:              " + startDate + " to " + endDate);
-        System.out.println("  Initial Capital:     $" + initialCapital.setScale(2, RoundingMode.HALF_UP));
-        System.out.println("  Final Capital:       $" + finalCapital.setScale(2, RoundingMode.HALF_UP));
-        System.out.println();
-
-        System.out.println(thinSep);
-        System.out.println("  PERFORMANCE METRICS");
-        System.out.println(thinSep);
-        System.out.printf("  Total Return:        %s%%%n", getTotalReturn().setScale(2, RoundingMode.HALF_UP));
-        System.out.printf("  Buy & Hold Return:   %s%%%n", getBuyAndHoldReturn(data).setScale(2, RoundingMode.HALF_UP));
-        System.out.printf("  Total P/L:           $%s%n", getTotalProfitLoss().setScale(2, RoundingMode.HALF_UP));
-        System.out.printf("  Sharpe Ratio:        %s%n", getSharpeRatio(TRADING_DAYS_PER_YEAR));
-        System.out.printf("  Max Drawdown:        %s%%%n", getMaxDrawdown().setScale(2, RoundingMode.HALF_UP));
-        System.out.printf("  Profit Factor:       %s%n", getProfitFactor());
-        System.out.println();
-
-        System.out.println(thinSep);
-        System.out.println("  TRADE STATISTICS");
-        System.out.println(thinSep);
-        System.out.printf("  Total Trades:        %d%n", getTotalTrades());
-        System.out.printf("  Winning Trades:      %d%n", getWinningTrades());
-        System.out.printf("  Losing Trades:       %d%n", getLosingTrades());
-        System.out.printf("  Win Rate:            %s%%%n", getWinRate().setScale(2, RoundingMode.HALF_UP));
-        System.out.printf("  Average Win:         $%s%n", getAverageWin());
-        System.out.printf("  Average Loss:        $%s%n", getAverageLoss());
-        System.out.println();
-
-        List<Trade> closed = closedTrades();
-        if (!closed.isEmpty()) {
-            System.out.println(thinSep);
-            System.out.println("  TRADE LOG");
-            System.out.println(thinSep);
-            int count = 1;
-            for (Trade t : closed) {
-                System.out.printf("  #%-4d %s%n", count++, t);
-            }
-        }
-
-        System.out.println();
-        System.out.println(separator);
-    }
-
-    private List<Trade> closedTrades() {
+    public List<Trade> getClosedTrades() {
         return trades.stream()
                 .filter(t -> t.getStatus() == Trade.Status.CLOSED)
                 .toList();
@@ -220,4 +168,6 @@ public final class BacktestResult {
     public BigDecimal getFinalCapital() { return finalCapital; }
     public List<Trade> getTrades() { return Collections.unmodifiableList(trades); }
     public List<BigDecimal> getEquityCurve() { return equityCurve; }
+    public String getStartDate() { return startDate; }
+    public String getEndDate() { return endDate; }
 }

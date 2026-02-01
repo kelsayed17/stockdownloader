@@ -1,0 +1,45 @@
+plugins {
+    id 'java'
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+}
+
+repositories {
+    mavenCentral()
+    mavenLocal()
+}
+
+dependencies {
+    implementation files('/opt/gradle-8.14.3/lib/guava-33.4.6-jre.jar')
+    implementation files('/opt/apache-maven-3.9.11/lib/httpclient-4.5.14.jar')
+    implementation files('/opt/apache-maven-3.9.11/lib/httpcore-4.4.16.jar')
+    implementation files('/opt/gradle-8.14.3/lib/commons-lang3-3.14.0.jar')
+    implementation files('/opt/gradle-8.14.3/lib/commons-io-2.15.1.jar')
+    implementation files('/opt/gradle-8.14.3/lib/jsoup-1.15.3.jar')
+
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.11.3'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}
+
+sourceSets {
+    main {
+        java {
+            srcDirs = ['src/main/java']
+        }
+    }
+    test {
+        java {
+            srcDirs = ['src/test/java']
+        }
+        resources {
+            srcDirs = ['src/test/resources']
+        }
+    }
+}

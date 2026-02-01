@@ -20,7 +20,7 @@ import java.util.logging.Logger;
  * Downloads historical price data and computes price movement patterns.
  * Returns a populated HistoricalData model.
  */
-public class YahooHistoricalClient {
+public final class YahooHistoricalClient {
 
     private static final Logger LOGGER = Logger.getLogger(YahooHistoricalClient.class.getName());
     private static final int MAX_RETRIES = 3;

@@ -5,7 +5,6 @@ import com.stockdownloader.model.HistoricalData;
 import com.stockdownloader.model.QuoteData;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 
 import static com.stockdownloader.util.BigDecimalMath.*;
 
@@ -13,12 +12,23 @@ import static com.stockdownloader.util.BigDecimalMath.*;
  * Calculates stock valuation metrics including Graham Number, intrinsic value,
  * margin of safety, P/E ratios, and projected returns.
  */
-public class FormulaCalculator {
+public final class FormulaCalculator {
 
     private static final BigDecimal DEFAULT_FIXED_EPS_GROWTH = new BigDecimal("0.06");
     private static final BigDecimal DEFAULT_DESIRED_RETURN = new BigDecimal("0.05");
     private static final BigDecimal DEFAULT_CORPORATE_BONDS_YIELD = new BigDecimal("4.09");
     private static final BigDecimal DEFAULT_RATE_OF_RETURN = new BigDecimal("4.4");
+
+    /**
+     * Required EPS-related inputs that must be provided before calculation.
+     */
+    public record ValuationInputs(
+            BigDecimal epsYearOne,
+            BigDecimal epsYearFive,
+            BigDecimal epsEstimateNextYear,
+            BigDecimal epsGrowth,
+            double fiveYearPeriod) {
+    }
 
     private BigDecimal fixedEPSGrowth = BigDecimal.ZERO;
     private BigDecimal desiredReturnPerYear = BigDecimal.ZERO;
@@ -56,22 +66,17 @@ public class FormulaCalculator {
     private BigDecimal priceAtMaxPSRatioLastQtr = BigDecimal.ZERO;
     private BigDecimal priceAtMinPSRatioThisQtr = BigDecimal.ZERO;
     private BigDecimal priceAtMinPSRatioLastQtr = BigDecimal.ZERO;
-    private BigDecimal epsYearFive = BigDecimal.ZERO;
-    private BigDecimal epsYearOne = BigDecimal.ZERO;
-    private BigDecimal epsEstimateNextYear = BigDecimal.ZERO;
-    private BigDecimal epsGrowth = BigDecimal.ZERO;
-    private double fiveYearPeriod;
 
     public FormulaCalculator() {}
 
-    public void calculate(QuoteData yf, FinancialData ms, HistoricalData yh) {
+    public void calculate(QuoteData yf, FinancialData ms, HistoricalData yh, ValuationInputs inputs) {
         BigDecimal revenuePerShareTTM = ms.getRevenuePerShareTTM();
         BigDecimal revenuePerShareTTMLastQtr = ms.getRevenuePerShareTTMLastQtr();
 
         computePSRatios(yh, revenuePerShareTTM, revenuePerShareTTMLastQtr);
         computeFixedRates();
-        computeValuationMetrics(yf);
-        computeProjections(yf, ms);
+        computeValuationMetrics(yf, inputs);
+        computeProjections(yf, ms, inputs);
     }
 
     private void computePSRatios(HistoricalData yh, BigDecimal revTTM, BigDecimal revTTMLastQtr) {
@@ -96,33 +101,33 @@ public class FormulaCalculator {
         rateOfReturn = DEFAULT_RATE_OF_RETURN;
     }
 
-    private void computeValuationMetrics(QuoteData yf) {
+    private void computeValuationMetrics(QuoteData yf, ValuationInputs inputs) {
         BigDecimal price = yf.getLastTradePriceOnly();
         BigDecimal eps = yf.getDilutedEPS();
 
         differenceFromPriceAtMinPSRatio = scale2(subtract(BigDecimal.ONE, divide(priceAtMinPSRatioThisQtr, price)));
         differenceFromPriceAtMaxPSRatio = scale2(subtract(BigDecimal.ONE, divide(price, priceAtMaxPSRatioThisQtr)));
-        growthMultiple = scale2(divide(epsYearFive, epsYearOne));
+        growthMultiple = scale2(divide(inputs.epsYearFive(), inputs.epsYearOne()));
         fiveYearGrowthMultiple = scale2(BigDecimal.valueOf(
-                Math.pow(Math.abs(growthMultiple.abs().doubleValue()), fiveYearPeriod)));
+                Math.pow(Math.abs(growthMultiple.abs().doubleValue()), inputs.fiveYearPeriod())));
         yearLowDifference = scale2(subtract(BigDecimal.ONE, divide(yf.getYearLow(), price)));
         yearsRangeDifference = scale2(subtract(yf.getYearHigh(), yf.getYearLow()));
         compoundAnnualGrowthRate = scale2(multiply(subtract(fiveYearGrowthMultiple, BigDecimal.ONE), BigDecimal.valueOf(100)));
-        foolEPSGrowth = scale2(divide(subtract(epsEstimateNextYear, eps), eps));
+        foolEPSGrowth = scale2(divide(subtract(inputs.epsEstimateNextYear(), eps), eps));
 
-        BigDecimal adjustedGrowth = add(BigDecimal.valueOf(8.5), multiply(BigDecimal.valueOf(2), multiply(epsGrowth, BigDecimal.valueOf(100))));
+        BigDecimal adjustedGrowth = add(BigDecimal.valueOf(8.5), multiply(BigDecimal.valueOf(2), multiply(inputs.epsGrowth(), BigDecimal.valueOf(100))));
         intrinsicValue = scale2(divide(multiply(multiply(eps, adjustedGrowth), rateOfReturn), corporateBondsYield));
         grahamMarginOfSafety = scale2(divide(intrinsicValue, price));
         buffettMarginOfSafety = scale2(multiply(intrinsicValue, BigDecimal.valueOf(0.75)));
 
         peRatioTTM = scale2(divide(price, eps));
-        forwardPERatio = scale2(divide(price, epsEstimateNextYear));
+        forwardPERatio = scale2(divide(price, inputs.epsEstimateNextYear()));
         assumedForwardPE = scale2(average(peRatioTTM, forwardPERatio));
     }
 
-    private void computeProjections(QuoteData yf, FinancialData ms) {
+    private void computeProjections(QuoteData yf, FinancialData ms, ValuationInputs inputs) {
         BigDecimal eps = yf.getDilutedEPS();
-        BigDecimal growthFactor = add(epsGrowth, BigDecimal.ONE);
+        BigDecimal growthFactor = add(inputs.epsGrowth(), BigDecimal.ONE);
 
         epsOverHoldingPeriodYearOne = scale2(multiply(eps, growthFactor));
         epsOverHoldingPeriodYearTwo = scale2(multiply(epsOverHoldingPeriodYearOne, growthFactor));
@@ -176,11 +181,4 @@ public class FormulaCalculator {
     public BigDecimal getPriceAtMaxPSRatioLastQtr() { return priceAtMaxPSRatioLastQtr; }
     public BigDecimal getPriceAtMinPSRatioThisQtr() { return priceAtMinPSRatioThisQtr; }
     public BigDecimal getPriceAtMinPSRatioLastQtr() { return priceAtMinPSRatioLastQtr; }
-
-    // Setters for configurable inputs
-    public void setEpsYearFive(BigDecimal v) { this.epsYearFive = v; }
-    public void setEpsYearOne(BigDecimal v) { this.epsYearOne = v; }
-    public void setEpsEstimateNextYear(BigDecimal v) { this.epsEstimateNextYear = v; }
-    public void setEpsGrowth(BigDecimal v) { this.epsGrowth = v; }
-    public void setFiveYearPeriod(double v) { this.fiveYearPeriod = v; }
 }

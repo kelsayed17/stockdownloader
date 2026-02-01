@@ -27,7 +27,7 @@ import org.apache.http.impl.client.HttpClientBuilder;
  * HTTP client for Yahoo Finance that handles authentication crumb extraction
  * and historical CSV data downloads.
  */
-public class YahooQuoteClient {
+public final class YahooQuoteClient {
 
     private static final Logger LOGGER = Logger.getLogger(YahooQuoteClient.class.getName());
     private static final String USER_AGENT = "Mozilla/5.0 (X11; U; Linux x86_64; en-US; rv:1.9.2.13) " +
