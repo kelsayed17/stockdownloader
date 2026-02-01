@@ -2,12 +2,21 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.List;
 
-public class MACDStrategy implements TradingStrategy {
-    private int fastPeriod;
-    private int slowPeriod;
-    private int signalPeriod;
+public final class MACDStrategy implements TradingStrategy {
+
+    private static final int EMA_SCALE = 10;
+
+    private final int fastPeriod;
+    private final int slowPeriod;
+    private final int signalPeriod;
 
     public MACDStrategy(int fastPeriod, int slowPeriod, int signalPeriod) {
+        if (fastPeriod <= 0 || slowPeriod <= 0 || signalPeriod <= 0) {
+            throw new IllegalArgumentException("All periods must be positive");
+        }
+        if (fastPeriod >= slowPeriod) {
+            throw new IllegalArgumentException("Fast period must be less than slow period");
+        }
         this.fastPeriod = fastPeriod;
         this.slowPeriod = slowPeriod;
         this.signalPeriod = signalPeriod;
@@ -15,7 +24,7 @@ public class MACDStrategy implements TradingStrategy {
 
     @Override
     public String getName() {
-        return "MACD (" + fastPeriod + "/" + slowPeriod + "/" + signalPeriod + ")";
+        return "MACD (%d/%d/%d)".formatted(fastPeriod, slowPeriod, signalPeriod);
     }
 
     @Override
@@ -56,22 +65,21 @@ public class MACDStrategy implements TradingStrategy {
         BigDecimal oneMinusMultiplier = BigDecimal.ONE.subtract(multiplier);
 
         // Start with SMA as seed
-        BigDecimal ema = BigDecimal.ZERO;
-        int startIndex = endIndex - period - period; // extra buffer
-        if (startIndex < 0) startIndex = 0;
+        int startIndex = Math.max(0, endIndex - period - period); // extra buffer
 
         // SMA seed
         BigDecimal sum = BigDecimal.ZERO;
-        for (int i = startIndex; i < startIndex + period && i <= endIndex; i++) {
+        int seedEnd = Math.min(startIndex + period, endIndex + 1);
+        for (int i = startIndex; i < seedEnd; i++) {
             sum = sum.add(data.get(i).getClose());
         }
-        ema = sum.divide(BigDecimal.valueOf(period), 10, RoundingMode.HALF_UP);
+        BigDecimal ema = sum.divide(BigDecimal.valueOf(period), EMA_SCALE, RoundingMode.HALF_UP);
 
         // Apply EMA formula forward
         for (int i = startIndex + period; i <= endIndex; i++) {
             ema = data.get(i).getClose().multiply(multiplier)
                     .add(ema.multiply(oneMinusMultiplier))
-                    .setScale(10, RoundingMode.HALF_UP);
+                    .setScale(EMA_SCALE, RoundingMode.HALF_UP);
         }
 
         return ema;
@@ -84,13 +92,10 @@ public class MACDStrategy implements TradingStrategy {
     }
 
     private BigDecimal calculateSignalLine(List<PriceData> data, int endIndex) {
-        // Signal line is EMA of MACD values over signalPeriod
         BigDecimal multiplier = BigDecimal.valueOf(2.0 / (signalPeriod + 1));
         BigDecimal oneMinusMultiplier = BigDecimal.ONE.subtract(multiplier);
 
-        // Calculate MACD values for the signal period window
-        int startIndex = endIndex - signalPeriod + 1;
-        if (startIndex < slowPeriod) startIndex = slowPeriod;
+        int startIndex = Math.max(slowPeriod, endIndex - signalPeriod + 1);
 
         // SMA seed of MACD values
         BigDecimal sum = BigDecimal.ZERO;
@@ -101,14 +106,14 @@ public class MACDStrategy implements TradingStrategy {
         }
         if (count == 0) return BigDecimal.ZERO;
 
-        BigDecimal signalEMA = sum.divide(BigDecimal.valueOf(count), 10, RoundingMode.HALF_UP);
+        BigDecimal signalEMA = sum.divide(BigDecimal.valueOf(count), EMA_SCALE, RoundingMode.HALF_UP);
 
         // Apply EMA forward for remaining points
         for (int i = startIndex + count; i <= endIndex; i++) {
             BigDecimal macdVal = calculateMACD(data, i);
             signalEMA = macdVal.multiply(multiplier)
                     .add(signalEMA.multiply(oneMinusMultiplier))
-                    .setScale(10, RoundingMode.HALF_UP);
+                    .setScale(EMA_SCALE, RoundingMode.HALF_UP);
         }
 
         return signalEMA;

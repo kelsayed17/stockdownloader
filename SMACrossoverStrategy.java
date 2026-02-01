@@ -2,18 +2,25 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.List;
 
-public class SMACrossoverStrategy implements TradingStrategy {
-    private int shortPeriod;
-    private int longPeriod;
+public final class SMACrossoverStrategy implements TradingStrategy {
+
+    private final int shortPeriod;
+    private final int longPeriod;
 
     public SMACrossoverStrategy(int shortPeriod, int longPeriod) {
+        if (shortPeriod <= 0 || longPeriod <= 0) {
+            throw new IllegalArgumentException("Periods must be positive");
+        }
+        if (shortPeriod >= longPeriod) {
+            throw new IllegalArgumentException("Short period must be less than long period");
+        }
         this.shortPeriod = shortPeriod;
         this.longPeriod = longPeriod;
     }
 
     @Override
     public String getName() {
-        return "SMA Crossover (" + shortPeriod + "/" + longPeriod + ")";
+        return "SMA Crossover (%d/%d)".formatted(shortPeriod, longPeriod);
     }
 
     @Override
