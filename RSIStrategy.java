@@ -1,13 +1,36 @@
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.util.List;
 
-public class RSIStrategy implements TradingStrategy {
-    private int period;
-    private BigDecimal oversoldThreshold;
-    private BigDecimal overboughtThreshold;
+/**
+ * RSI (Relative Strength Index) mean-reversion strategy.
+ *
+ * <ul>
+ *   <li><b>BUY:</b> RSI crosses above the oversold threshold (recovery from oversold)</li>
+ *   <li><b>SELL:</b> RSI crosses below the overbought threshold (retreat from overbought)</li>
+ * </ul>
+ *
+ * <p>Common configurations: period=14, oversold=30, overbought=70.</p>
+ */
+public final class RSIStrategy implements TradingStrategy {
+
+    private final int period;
+    private final BigDecimal oversoldThreshold;
+    private final BigDecimal overboughtThreshold;
 
     public RSIStrategy(int period, double oversold, double overbought) {
+        if (period <= 0) {
+            throw new IllegalArgumentException("RSI period must be positive: " + period);
+        }
+        if (oversold < 0 || oversold > 100 || overbought < 0 || overbought > 100) {
+            throw new IllegalArgumentException(
+                    "Thresholds must be in [0, 100]: oversold=%s, overbought=%s"
+                            .formatted(oversold, overbought));
+        }
+        if (oversold >= overbought) {
+            throw new IllegalArgumentException(
+                    "Oversold (%s) must be less than overbought (%s)".formatted(oversold, overbought));
+        }
+
         this.period = period;
         this.oversoldThreshold = BigDecimal.valueOf(oversold);
         this.overboughtThreshold = BigDecimal.valueOf(overbought);
@@ -15,25 +38,29 @@ public class RSIStrategy implements TradingStrategy {
 
     @Override
     public String getName() {
-        return "RSI (" + period + ") [" + oversoldThreshold + "/" + overboughtThreshold + "]";
+        return "RSI (%d) [%s/%s]".formatted(period, oversoldThreshold, overboughtThreshold);
     }
 
     @Override
     public Signal evaluate(List<PriceData> data, int currentIndex) {
-        if (currentIndex < period + 1) {
+        validateEvaluationInputs(data, currentIndex);
+
+        if (!isWarmedUp(currentIndex)) {
             return Signal.HOLD;
         }
 
-        BigDecimal currentRSI = calculateRSI(data, currentIndex);
-        BigDecimal prevRSI = calculateRSI(data, currentIndex - 1);
+        var currentRSI = TechnicalIndicators.rsi(data, currentIndex, period);
+        var prevRSI = TechnicalIndicators.rsi(data, currentIndex - 1, period);
 
-        // Buy when RSI crosses above oversold threshold (coming out of oversold)
-        if (currentRSI.compareTo(oversoldThreshold) > 0 && prevRSI.compareTo(oversoldThreshold) <= 0) {
+        // Buy: RSI crosses above oversold threshold (recovery)
+        if (currentRSI.compareTo(oversoldThreshold) > 0
+                && prevRSI.compareTo(oversoldThreshold) <= 0) {
             return Signal.BUY;
         }
 
-        // Sell when RSI crosses below overbought threshold (coming out of overbought)
-        if (currentRSI.compareTo(overboughtThreshold) < 0 && prevRSI.compareTo(overboughtThreshold) >= 0) {
+        // Sell: RSI crosses below overbought threshold (retreat)
+        if (currentRSI.compareTo(overboughtThreshold) < 0
+                && prevRSI.compareTo(overboughtThreshold) >= 0) {
             return Signal.SELL;
         }
 
@@ -45,31 +72,12 @@ public class RSIStrategy implements TradingStrategy {
         return period + 1;
     }
 
-    private BigDecimal calculateRSI(List<PriceData> data, int endIndex) {
-        BigDecimal avgGain = BigDecimal.ZERO;
-        BigDecimal avgLoss = BigDecimal.ZERO;
+    public int getPeriod()                    { return period; }
+    public BigDecimal getOversoldThreshold()  { return oversoldThreshold; }
+    public BigDecimal getOverboughtThreshold() { return overboughtThreshold; }
 
-        // Calculate initial average gain/loss
-        for (int i = endIndex - period + 1; i <= endIndex; i++) {
-            BigDecimal change = data.get(i).getClose().subtract(data.get(i - 1).getClose());
-            if (change.compareTo(BigDecimal.ZERO) > 0) {
-                avgGain = avgGain.add(change);
-            } else {
-                avgLoss = avgLoss.add(change.abs());
-            }
-        }
-
-        avgGain = avgGain.divide(BigDecimal.valueOf(period), 10, RoundingMode.HALF_UP);
-        avgLoss = avgLoss.divide(BigDecimal.valueOf(period), 10, RoundingMode.HALF_UP);
-
-        if (avgLoss.compareTo(BigDecimal.ZERO) == 0) {
-            return BigDecimal.valueOf(100);
-        }
-
-        BigDecimal rs = avgGain.divide(avgLoss, 10, RoundingMode.HALF_UP);
-        BigDecimal rsi = BigDecimal.valueOf(100).subtract(
-                BigDecimal.valueOf(100).divide(BigDecimal.ONE.add(rs), 6, RoundingMode.HALF_UP));
-
-        return rsi;
+    @Override
+    public String toString() {
+        return getName();
     }
 }

@@ -1,161 +1,183 @@
-import java.io.BufferedReader;
-import java.io.FileReader;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 
 import com.opencsv.CSVReader;
 
-public class SPYBacktest {
+/**
+ * Main entry point for the SPY trading strategy backtester.
+ *
+ * <p>Loads historical SPY data (from a local CSV file or Yahoo Finance),
+ * runs multiple trading strategies through the {@link BacktestEngine},
+ * and prints individual reports plus a side-by-side comparison table.</p>
+ *
+ * <p>Usage:</p>
+ * <pre>{@code
+ * java SPYBacktest                   # attempts Yahoo Finance download
+ * java SPYBacktest spy_data.csv      # loads from local CSV file
+ * }</pre>
+ */
+public final class SPYBacktest {
 
     private static final BigDecimal INITIAL_CAPITAL = new BigDecimal("100000.00");
-    private static final BigDecimal COMMISSION = new BigDecimal("0.00"); // Most brokers are commission-free now
+    private static final BigDecimal COMMISSION = BigDecimal.ZERO;
+    private static final int DISPLAY_SCALE = 2;
 
-    public static void main(String[] args) throws Exception {
-        System.out.println("========================================");
-        System.out.println("  SPY Trading Strategy Backtester");
-        System.out.println("========================================");
-        System.out.println();
+    /** All strategies to be backtested. Immutable list via {@code List.of}. */
+    private static final List<TradingStrategy> STRATEGIES = List.of(
+            new SMACrossoverStrategy(50, 200),
+            new SMACrossoverStrategy(20, 50),
+            new RSIStrategy(14, 30, 70),
+            new RSIStrategy(14, 25, 75),
+            new MACDStrategy(12, 26, 9)
+    );
 
-        // Load SPY historical data
-        List<PriceData> data;
-        if (args.length > 0) {
-            System.out.println("Loading SPY data from file: " + args[0]);
-            data = loadFromCSV(args[0]);
-        } else {
-            System.out.println("Loading SPY data from Yahoo Finance...");
-            data = downloadSPYData();
-        }
+    private SPYBacktest() {
+        throw new AssertionError("Utility class — do not instantiate");
+    }
+
+    public static void main(String[] args) {
+        printBanner();
+
+        List<PriceData> data = loadData(args);
 
         if (data.isEmpty()) {
-            System.out.println("ERROR: No price data loaded. Provide a CSV file path as argument:");
-            System.out.println("  java SPYBacktest spy_data.csv");
-            System.out.println();
-            System.out.println("CSV format: Date,Open,High,Low,Close,Adj Close,Volume");
-            System.out.println("  (Yahoo Finance historical data format)");
-            return;
+            System.err.println("ERROR: No price data loaded. Provide a CSV file path as argument:");
+            System.err.println("  java SPYBacktest spy_data.csv");
+            System.err.println();
+            System.err.println("CSV format: Date,Open,High,Low,Close,Adj Close,Volume");
+            System.err.println("  (Yahoo Finance historical data format, dates as yyyy-MM-dd)");
+            System.exit(1);
         }
 
         System.out.println("Loaded " + data.size() + " trading days");
-        System.out.println("Date range: " + data.get(0).getDate() + " to " + data.get(data.size() - 1).getDate());
-        System.out.println("Starting capital: $" + INITIAL_CAPITAL.setScale(2, RoundingMode.HALF_UP));
-        System.out.println();
+        System.out.println("Date range: " + data.getFirst().date() + " to " + data.getLast().date());
+        System.out.printf("Starting capital: $%s%n%n", INITIAL_CAPITAL.setScale(DISPLAY_SCALE, RoundingMode.HALF_UP));
 
-        // Define strategies
-        List<TradingStrategy> strategies = new ArrayList<>();
-        strategies.add(new SMACrossoverStrategy(50, 200));
-        strategies.add(new SMACrossoverStrategy(20, 50));
-        strategies.add(new RSIStrategy(14, 30, 70));
-        strategies.add(new RSIStrategy(14, 25, 75));
-        strategies.add(new MACDStrategy(12, 26, 9));
+        BacktestEngine engine = new BacktestEngine.Builder()
+                .initialCapital(INITIAL_CAPITAL)
+                .commission(COMMISSION)
+                .build();
 
-        // Run backtests
-        BacktestEngine engine = new BacktestEngine(INITIAL_CAPITAL, COMMISSION);
         List<BacktestResult> results = new ArrayList<>();
 
-        for (TradingStrategy strategy : strategies) {
+        for (TradingStrategy strategy : STRATEGIES) {
             System.out.println("Running backtest: " + strategy.getName() + "...");
             BacktestResult result = engine.run(strategy, data);
             results.add(result);
             result.printReport(data);
         }
 
-        // Print comparison summary
         printComparison(results, data);
     }
 
-    private static List<PriceData> loadFromCSV(String filename) {
+    // ---- Data Loading ----
+
+    private static List<PriceData> loadData(String[] args) {
+        if (args.length > 0) {
+            System.out.println("Loading SPY data from file: " + args[0]);
+            return loadFromCSV(Path.of(args[0]));
+        }
+
+        System.out.println("Loading SPY data from Yahoo Finance...");
+        List<PriceData> data = downloadSPYData();
+        if (data.isEmpty()) {
+            System.out.println("Download failed. Checking for local SPY.csv fallback...");
+            Path fallback = Path.of("SPY.csv");
+            if (Files.exists(fallback)) {
+                return loadFromCSV(fallback);
+            }
+        }
+        return data;
+    }
+
+    /**
+     * Loads price data from a local CSV file using try-with-resources.
+     * Skips rows with unparseable data (e.g., "null" values from Yahoo).
+     */
+    private static List<PriceData> loadFromCSV(Path path) {
         List<PriceData> data = new ArrayList<>();
 
-        try {
-            CSVReader reader = new CSVReader(new FileReader(filename));
-
-            // Skip header
-            String[] header = reader.readNext();
+        try (CSVReader reader = new CSVReader(Files.newBufferedReader(path))) {
+            reader.readNext(); // skip header
 
             String[] line;
             while ((line = reader.readNext()) != null) {
                 try {
-                    String date = line[0];
-                    BigDecimal open = new BigDecimal(line[1]);
-                    BigDecimal high = new BigDecimal(line[2]);
-                    BigDecimal low = new BigDecimal(line[3]);
-                    BigDecimal close = new BigDecimal(line[4]);
-                    BigDecimal adjClose = line.length > 5 ? new BigDecimal(line[5]) : close;
-                    long volume = line.length > 6 ? Long.parseLong(line[6]) : 0;
-
-                    data.add(new PriceData(date, open, high, low, close, adjClose, volume));
-                } catch (NumberFormatException e) {
-                    // Skip lines with invalid data (e.g., "null" values)
-                    continue;
+                    data.add(PriceData.fromCsvRow(line));
+                } catch (NumberFormatException | java.time.format.DateTimeParseException e) {
+                    // Skip rows with invalid data (Yahoo sometimes has "null" values)
                 }
             }
-
-            reader.close();
+        } catch (IOException e) {
+            System.err.println("Error reading CSV file: " + e.getMessage());
         } catch (Exception e) {
-            System.out.println("Error loading CSV: " + e.getMessage());
+            System.err.println("Error parsing CSV: " + e.getMessage());
         }
 
-        return data;
+        return List.copyOf(data);
     }
 
+    /**
+     * Attempts to download ~5 years of SPY data from Yahoo Finance.
+     * Uses the project's existing {@link GetYahooQuotes} for authentication.
+     */
     private static List<PriceData> downloadSPYData() {
         List<PriceData> data = new ArrayList<>();
 
         try {
-            // Attempt to download from Yahoo Finance via the existing GetYahooQuotes mechanism
-            GetYahooQuotes quotes = new GetYahooQuotes();
+            var quotes = new GetYahooQuotes();
             String crumb = quotes.getCrumb("SPY");
 
-            if (crumb != null && !crumb.isEmpty()) {
-                // Download 5 years of data
-                long endDate = System.currentTimeMillis() / 1000;
-                long startDate = endDate - (5L * 365 * 24 * 60 * 60); // ~5 years back
+            if (crumb == null || crumb.isEmpty()) {
+                System.out.println("Could not obtain Yahoo Finance authentication crumb.");
+                return List.of();
+            }
 
-                String url = String.format(
-                        "https://query1.finance.yahoo.com/v7/finance/download/SPY?period1=%d&period2=%d&interval=1d&events=history&crumb=%s",
-                        startDate, endDate, crumb);
+            long endEpoch = System.currentTimeMillis() / 1000;
+            long startEpoch = endEpoch - (5L * 365 * 24 * 60 * 60);
 
-                InputStream input = new URL(url).openStream();
-                CSVReader reader = new CSVReader(new InputStreamReader(input));
+            String url = "https://query1.finance.yahoo.com/v7/finance/download/SPY?period1=%d&period2=%d&interval=1d&events=history&crumb=%s"
+                    .formatted(startEpoch, endEpoch, crumb);
 
-                // Skip header
-                reader.readNext();
+            try (InputStream input = new URL(url).openStream();
+                 CSVReader reader = new CSVReader(new InputStreamReader(input))) {
+
+                reader.readNext(); // skip header
 
                 String[] line;
                 while ((line = reader.readNext()) != null) {
                     try {
-                        String date = line[0];
-                        BigDecimal open = new BigDecimal(line[1]);
-                        BigDecimal high = new BigDecimal(line[2]);
-                        BigDecimal low = new BigDecimal(line[3]);
-                        BigDecimal close = new BigDecimal(line[4]);
-                        BigDecimal adjClose = new BigDecimal(line[5]);
-                        long volume = Long.parseLong(line[6]);
-
-                        data.add(new PriceData(date, open, high, low, close, adjClose, volume));
-                    } catch (NumberFormatException e) {
-                        continue;
+                        data.add(PriceData.fromCsvRow(line));
+                    } catch (NumberFormatException | java.time.format.DateTimeParseException e) {
+                        // skip invalid rows
                     }
                 }
-
-                reader.close();
-                System.out.println("Downloaded " + data.size() + " days of SPY data from Yahoo Finance");
-            } else {
-                System.out.println("Could not obtain Yahoo Finance authentication crumb.");
-                System.out.println("Please provide a CSV file instead.");
             }
+
+            System.out.println("Downloaded " + data.size() + " days of SPY data from Yahoo Finance");
         } catch (Exception e) {
             System.out.println("Could not download SPY data: " + e.getMessage());
-            System.out.println("Please provide a CSV file as argument: java SPYBacktest spy_data.csv");
         }
 
-        return data;
+        return List.copyOf(data);
+    }
+
+    // ---- Reporting ----
+
+    private static void printBanner() {
+        System.out.println("========================================");
+        System.out.println("  SPY Trading Strategy Backtester");
+        System.out.println("========================================");
+        System.out.println();
     }
 
     private static void printComparison(List<BacktestResult> results, List<PriceData> data) {
@@ -168,57 +190,47 @@ public class SPYBacktest {
         System.out.println(separator);
         System.out.println();
 
-        // Buy and hold benchmark
-        BigDecimal buyAndHold = BigDecimal.ZERO;
-        if (!data.isEmpty()) {
-            BigDecimal first = data.get(0).getClose();
-            BigDecimal last = data.get(data.size() - 1).getClose();
-            buyAndHold = last.subtract(first).divide(first, 6, RoundingMode.HALF_UP).multiply(BigDecimal.valueOf(100));
-        }
+        BigDecimal buyAndHold = BacktestResult.buyAndHoldReturn(data);
+
         System.out.printf("  %-35s %10s %10s %10s %10s %10s%n",
                 "Strategy", "Return", "Sharpe", "MaxDD", "Trades", "Win Rate");
         System.out.println(thinSep);
         System.out.printf("  %-35s %9s%% %10s %9s%% %10s %10s%n",
                 "Buy & Hold (Benchmark)",
-                buyAndHold.setScale(2, RoundingMode.HALF_UP),
+                buyAndHold.setScale(DISPLAY_SCALE, RoundingMode.HALF_UP),
                 "N/A", "N/A", "1", "N/A");
 
         for (BacktestResult r : results) {
             System.out.printf("  %-35s %9s%% %10s %9s%% %10d %9s%%%n",
                     r.getStrategyName(),
-                    r.getTotalReturn().setScale(2, RoundingMode.HALF_UP),
-                    r.getSharpeRatio(252),
-                    r.getMaxDrawdown().setScale(2, RoundingMode.HALF_UP),
+                    r.getTotalReturn().setScale(DISPLAY_SCALE, RoundingMode.HALF_UP),
+                    r.getSharpeRatio(TechnicalIndicators.TRADING_DAYS_PER_YEAR),
+                    r.getMaxDrawdown().setScale(DISPLAY_SCALE, RoundingMode.HALF_UP),
                     r.getTotalTrades(),
-                    r.getWinRate().setScale(2, RoundingMode.HALF_UP));
+                    r.getWinRate().setScale(DISPLAY_SCALE, RoundingMode.HALF_UP));
         }
 
         System.out.println(thinSep);
 
-        // Find best strategy
-        BacktestResult best = null;
-        for (BacktestResult r : results) {
-            if (best == null || r.getTotalReturn().compareTo(best.getTotalReturn()) > 0) {
-                best = r;
-            }
-        }
+        results.stream()
+                .max(Comparator.comparing(BacktestResult::getTotalReturn))
+                .ifPresent(best -> {
+                    System.out.println();
+                    System.out.println("  Best performing strategy: " + best.getStrategyName());
+                    System.out.printf("  Return: %s%% | Sharpe: %s | Max Drawdown: %s%%%n",
+                            best.getTotalReturn().setScale(DISPLAY_SCALE, RoundingMode.HALF_UP),
+                            best.getSharpeRatio(TechnicalIndicators.TRADING_DAYS_PER_YEAR),
+                            best.getMaxDrawdown().setScale(DISPLAY_SCALE, RoundingMode.HALF_UP));
 
-        if (best != null) {
-            System.out.println();
-            System.out.println("  Best performing strategy: " + best.getStrategyName());
-            System.out.printf("  Return: %s%% | Sharpe: %s | Max Drawdown: %s%%%n",
-                    best.getTotalReturn().setScale(2, RoundingMode.HALF_UP),
-                    best.getSharpeRatio(252),
-                    best.getMaxDrawdown().setScale(2, RoundingMode.HALF_UP));
-
-            if (best.getTotalReturn().compareTo(buyAndHold) > 0) {
-                System.out.println("  >> Outperformed Buy & Hold by " +
-                        best.getTotalReturn().subtract(buyAndHold).setScale(2, RoundingMode.HALF_UP) + " percentage points");
-            } else {
-                System.out.println("  >> Underperformed Buy & Hold by " +
-                        buyAndHold.subtract(best.getTotalReturn()).setScale(2, RoundingMode.HALF_UP) + " percentage points");
-            }
-        }
+                    BigDecimal diff = best.getTotalReturn().subtract(buyAndHold);
+                    if (diff.signum() > 0) {
+                        System.out.println("  >> Outperformed Buy & Hold by " +
+                                diff.setScale(DISPLAY_SCALE, RoundingMode.HALF_UP) + " percentage points");
+                    } else {
+                        System.out.println("  >> Underperformed Buy & Hold by " +
+                                diff.abs().setScale(DISPLAY_SCALE, RoundingMode.HALF_UP) + " percentage points");
+                    }
+                });
 
         System.out.println();
         System.out.println(separator);

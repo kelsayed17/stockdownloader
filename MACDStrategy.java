@@ -1,13 +1,33 @@
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.util.List;
 
-public class MACDStrategy implements TradingStrategy {
-    private int fastPeriod;
-    private int slowPeriod;
-    private int signalPeriod;
+/**
+ * MACD (Moving Average Convergence Divergence) signal-line crossover strategy.
+ *
+ * <ul>
+ *   <li><b>BUY:</b> MACD line crosses above the signal line (bullish momentum)</li>
+ *   <li><b>SELL:</b> MACD line crosses below the signal line (bearish momentum)</li>
+ * </ul>
+ *
+ * <p>Standard configuration: fast=12, slow=26, signal=9.</p>
+ */
+public final class MACDStrategy implements TradingStrategy {
+
+    private final int fastPeriod;
+    private final int slowPeriod;
+    private final int signalPeriod;
 
     public MACDStrategy(int fastPeriod, int slowPeriod, int signalPeriod) {
+        if (fastPeriod <= 0 || slowPeriod <= 0 || signalPeriod <= 0) {
+            throw new IllegalArgumentException(
+                    "All periods must be positive: fast=%d, slow=%d, signal=%d"
+                            .formatted(fastPeriod, slowPeriod, signalPeriod));
+        }
+        if (fastPeriod >= slowPeriod) {
+            throw new IllegalArgumentException(
+                    "Fast period (%d) must be less than slow period (%d)"
+                            .formatted(fastPeriod, slowPeriod));
+        }
+
         this.fastPeriod = fastPeriod;
         this.slowPeriod = slowPeriod;
         this.signalPeriod = signalPeriod;
@@ -15,33 +35,27 @@ public class MACDStrategy implements TradingStrategy {
 
     @Override
     public String getName() {
-        return "MACD (" + fastPeriod + "/" + slowPeriod + "/" + signalPeriod + ")";
+        return "MACD (%d/%d/%d)".formatted(fastPeriod, slowPeriod, signalPeriod);
     }
 
     @Override
     public Signal evaluate(List<PriceData> data, int currentIndex) {
-        int minRequired = slowPeriod + signalPeriod;
-        if (currentIndex < minRequired) {
+        validateEvaluationInputs(data, currentIndex);
+
+        if (!isWarmedUp(currentIndex)) {
             return Signal.HOLD;
         }
 
-        BigDecimal currentMACD = calculateMACD(data, currentIndex);
-        BigDecimal currentSignal = calculateSignalLine(data, currentIndex);
-        BigDecimal prevMACD = calculateMACD(data, currentIndex - 1);
-        BigDecimal prevSignal = calculateSignalLine(data, currentIndex - 1);
+        var currentMACD = TechnicalIndicators.macdLine(data, currentIndex, fastPeriod, slowPeriod);
+        var currentSignal = TechnicalIndicators.macdSignal(data, currentIndex, fastPeriod, slowPeriod, signalPeriod);
+        var prevMACD = TechnicalIndicators.macdLine(data, currentIndex - 1, fastPeriod, slowPeriod);
+        var prevSignal = TechnicalIndicators.macdSignal(data, currentIndex - 1, fastPeriod, slowPeriod, signalPeriod);
 
-        boolean macdAboveSignalNow = currentMACD.compareTo(currentSignal) > 0;
-        boolean macdAboveSignalPrev = prevMACD.compareTo(prevSignal) > 0;
+        boolean aboveNow = currentMACD.compareTo(currentSignal) > 0;
+        boolean abovePrev = prevMACD.compareTo(prevSignal) > 0;
 
-        // Bullish crossover: MACD crosses above signal line
-        if (macdAboveSignalNow && !macdAboveSignalPrev) {
-            return Signal.BUY;
-        }
-
-        // Bearish crossover: MACD crosses below signal line
-        if (!macdAboveSignalNow && macdAboveSignalPrev) {
-            return Signal.SELL;
-        }
+        if (aboveNow && !abovePrev) return Signal.BUY;
+        if (!aboveNow && abovePrev) return Signal.SELL;
 
         return Signal.HOLD;
     }
@@ -51,66 +65,12 @@ public class MACDStrategy implements TradingStrategy {
         return slowPeriod + signalPeriod;
     }
 
-    private BigDecimal calculateEMA(List<PriceData> data, int endIndex, int period) {
-        BigDecimal multiplier = BigDecimal.valueOf(2.0 / (period + 1));
-        BigDecimal oneMinusMultiplier = BigDecimal.ONE.subtract(multiplier);
+    public int getFastPeriod()   { return fastPeriod; }
+    public int getSlowPeriod()   { return slowPeriod; }
+    public int getSignalPeriod() { return signalPeriod; }
 
-        // Start with SMA as seed
-        BigDecimal ema = BigDecimal.ZERO;
-        int startIndex = endIndex - period - period; // extra buffer
-        if (startIndex < 0) startIndex = 0;
-
-        // SMA seed
-        BigDecimal sum = BigDecimal.ZERO;
-        for (int i = startIndex; i < startIndex + period && i <= endIndex; i++) {
-            sum = sum.add(data.get(i).getClose());
-        }
-        ema = sum.divide(BigDecimal.valueOf(period), 10, RoundingMode.HALF_UP);
-
-        // Apply EMA formula forward
-        for (int i = startIndex + period; i <= endIndex; i++) {
-            ema = data.get(i).getClose().multiply(multiplier)
-                    .add(ema.multiply(oneMinusMultiplier))
-                    .setScale(10, RoundingMode.HALF_UP);
-        }
-
-        return ema;
-    }
-
-    private BigDecimal calculateMACD(List<PriceData> data, int endIndex) {
-        BigDecimal fastEMA = calculateEMA(data, endIndex, fastPeriod);
-        BigDecimal slowEMA = calculateEMA(data, endIndex, slowPeriod);
-        return fastEMA.subtract(slowEMA);
-    }
-
-    private BigDecimal calculateSignalLine(List<PriceData> data, int endIndex) {
-        // Signal line is EMA of MACD values over signalPeriod
-        BigDecimal multiplier = BigDecimal.valueOf(2.0 / (signalPeriod + 1));
-        BigDecimal oneMinusMultiplier = BigDecimal.ONE.subtract(multiplier);
-
-        // Calculate MACD values for the signal period window
-        int startIndex = endIndex - signalPeriod + 1;
-        if (startIndex < slowPeriod) startIndex = slowPeriod;
-
-        // SMA seed of MACD values
-        BigDecimal sum = BigDecimal.ZERO;
-        int count = 0;
-        for (int i = startIndex; i < startIndex + signalPeriod && i <= endIndex; i++) {
-            sum = sum.add(calculateMACD(data, i));
-            count++;
-        }
-        if (count == 0) return BigDecimal.ZERO;
-
-        BigDecimal signalEMA = sum.divide(BigDecimal.valueOf(count), 10, RoundingMode.HALF_UP);
-
-        // Apply EMA forward for remaining points
-        for (int i = startIndex + count; i <= endIndex; i++) {
-            BigDecimal macdVal = calculateMACD(data, i);
-            signalEMA = macdVal.multiply(multiplier)
-                    .add(signalEMA.multiply(oneMinusMultiplier))
-                    .setScale(10, RoundingMode.HALF_UP);
-        }
-
-        return signalEMA;
+    @Override
+    public String toString() {
+        return getName();
     }
 }
