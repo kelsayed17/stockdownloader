@@ -1,6 +1,7 @@
 import java.util.List;
 
-public interface TradingStrategy {
+public sealed interface TradingStrategy
+        permits SMACrossoverStrategy, RSIStrategy, MACDStrategy {
 
     enum Signal { BUY, SELL, HOLD }
 

@@ -1,65 +1,89 @@
+import java.time.DayOfWeek;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.Calendar;
 import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.Calendar;
 
 public class Dates {
-    // Actual Dates
-    private Calendar dateToday;
-    private Calendar dateTomorrow;
-    private Calendar dateCustom;
-    private Calendar dateYesterday;
-    private Calendar fromDate;
-    private Calendar toDate;
 
-    // Actual Date Strings
-    private String today;
-    private String tomorrow;
-    private String custom;
-    private String yesterday;
+    private static final DateTimeFormatter MONTH_FORMAT = DateTimeFormatter.ofPattern("MM");
+    private static final DateTimeFormatter DAY_FORMAT = DateTimeFormatter.ofPattern("dd");
+    private static final DateTimeFormatter YEAR_FORMAT = DateTimeFormatter.ofPattern("yyyy");
+    private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("MM/dd/yyyy");
+    private static final DateTimeFormatter ZACKS_FORMAT = DateTimeFormatter.ofPattern("MM-dd-yyyy");
+    private static final DateTimeFormatter NASDAQ_FORMAT = DateTimeFormatter.ofPattern("yyyy-MMM-dd");
+    private static final DateTimeFormatter YAHOO_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+    private static final DateTimeFormatter YAHOO_EARNINGS_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd");
+    private static final DateTimeFormatter MORNINGSTAR_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM");
+    private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("MM/dd/yyyy hh:mm:ss a");
 
-    // Adjusted Dates
-    private Calendar yesterdayMarket;
-    private Calendar todayMarket;
-    private Calendar tomorrowMarket;
-
-    // Fiscal quarters
+    // Legacy Calendar/DateFormat support for backward compatibility
+    private final Calendar dateToday;
+    private final Calendar dateTomorrow;
+    private final Calendar dateCustom;
+    private final Calendar dateYesterday;
+    private final Calendar fromDate;
+    private final Calendar toDate;
+    private final Calendar yesterdayMarket;
+    private final Calendar todayMarket;
+    private final Calendar tomorrowMarket;
     private Calendar fiscalQtr1;
     private Calendar fiscalQtr2;
     private Calendar fiscalQtr3;
     private Calendar fiscalQtrPrevious;
     private Calendar fiscalQtrCurrent;
 
-    // Fiscal quarters strings
+    private final String today;
+    private final String tomorrow;
+    private final String custom;
+    private final String yesterday;
+
     private String fiscalQtr1Str;
     private String fiscalQtr2Str;
     private String fiscalQtr3Str;
     private String fiscalQtrPreviousStr;
     private String fiscalQtrCurrentStr;
 
-    // Date properties
-    private String currentMonth;
-    private String currentDay;
-    private String currentYear;
-    private String fromMonth;
-    private String fromDay;
-    private String fromYear;
+    private final String currentMonth;
+    private final String currentDay;
+    private final String currentYear;
+    private final String fromMonth;
+    private final String fromDay;
+    private final String fromYear;
 
-    // Date formats
-    private DateFormat monthFormat;
-    private DateFormat dayFormat;
-    private DateFormat yearFormat;
-    private DateFormat dateFormat;
-    private DateFormat zacksFormat;
-    private DateFormat nasdaqFormat;
-    private DateFormat yahooFormat;
-    private DateFormat yahooEarningsFormat;
-    private DateFormat morningstarFormat;
-    private DateFormat timeFormat;
+    private final DateFormat dateFormat;
+    private final DateFormat zacksFormat;
+    private final DateFormat nasdaqFormat;
+    private final DateFormat yahooFormat;
+    private final DateFormat yahooEarningsFormat;
+    private final DateFormat morningstarFormat;
+    private final DateFormat monthFormat;
+    private final DateFormat dayFormat;
+    private final DateFormat yearFormat;
+    private final DateFormat timeFormat;
 
     public Dates() throws ParseException {
+        LocalDate now = LocalDate.now();
+        LocalDate tomorrowDate = now.plusDays(1);
+        LocalDate yesterdayDate = now.minusDays(1);
+        LocalDate customDate = now.minusMonths(6);
 
-        // Dates
+        // Initialize date formats
+        monthFormat = new SimpleDateFormat("MM");
+        dayFormat = new SimpleDateFormat("dd");
+        yearFormat = new SimpleDateFormat("yyyy");
+        dateFormat = new SimpleDateFormat("MM/dd/yyyy");
+        zacksFormat = new SimpleDateFormat("MM-dd-yyyy");
+        nasdaqFormat = new SimpleDateFormat("yyyy-MMM-dd");
+        yahooFormat = new SimpleDateFormat("yyyy-MM-dd");
+        yahooEarningsFormat = new SimpleDateFormat("yyyyMMdd");
+        morningstarFormat = new SimpleDateFormat("yyyy-MM");
+        timeFormat = new SimpleDateFormat("MM/dd/yyyy hh:mm:ss a");
+
+        // Calendar instances
         dateToday = Calendar.getInstance();
         dateTomorrow = Calendar.getInstance();
         dateCustom = Calendar.getInstance();
@@ -75,69 +99,29 @@ public class Dates {
         fiscalQtrPrevious = Calendar.getInstance();
         fiscalQtrCurrent = Calendar.getInstance();
 
-        // Formats
-        monthFormat = new SimpleDateFormat("MM");
-        dayFormat = new SimpleDateFormat("dd");
-        yearFormat = new SimpleDateFormat("yyyy");
-        dateFormat = new SimpleDateFormat("MM/dd/yyyy");
-        zacksFormat = new SimpleDateFormat("MM-dd-yyyy");
-        nasdaqFormat = new SimpleDateFormat("yyyy-MMM-dd");
-        yahooFormat = new SimpleDateFormat("yyyy-MM-dd");
-        yahooEarningsFormat = new SimpleDateFormat("yyyyMMdd");
-        morningstarFormat = new SimpleDateFormat("yyyy-MM");
-        timeFormat = new SimpleDateFormat("MM/dd/yyyy hh:mm:ss a");
-
-        // Change dates
-        dateCustom.add(Calendar.MONTH, -6);
         dateTomorrow.add(Calendar.DAY_OF_MONTH, 1);
         dateYesterday.add(Calendar.DAY_OF_MONTH, -1);
+        dateCustom.add(Calendar.MONTH, -6);
 
-        // Format dates
-        currentMonth = monthFormat.format(dateToday.getTime());
-        currentDay = dayFormat.format(dateToday.getTime());
-        currentYear = yearFormat.format(dateToday.getTime());
-        fromMonth = monthFormat.format(dateCustom.getTime());
-        fromDay = dayFormat.format(dateCustom.getTime());
-        fromYear = yearFormat.format(dateCustom.getTime());
+        // Format date components
+        currentMonth = now.format(MONTH_FORMAT);
+        currentDay = now.format(DAY_FORMAT);
+        currentYear = now.format(YEAR_FORMAT);
+        fromMonth = customDate.format(MONTH_FORMAT);
+        fromDay = customDate.format(DAY_FORMAT);
+        fromYear = customDate.format(YEAR_FORMAT);
 
-        // Adjust if yesterday is Saturday
-        if (dateYesterday.get(Calendar.DAY_OF_WEEK) == Calendar.SATURDAY)
-            yesterdayMarket.add(Calendar.DAY_OF_MONTH, -3);
+        // Adjust market dates for weekends
+        yesterdayMarket.add(Calendar.DAY_OF_MONTH, adjustForWeekend(yesterdayDate.getDayOfWeek(), -1));
+        adjustTodayMarket(now.getDayOfWeek());
+        adjustTomorrowMarket(tomorrowDate.getDayOfWeek());
 
-        // Adjust if yesterday is Sunday
-        else if (dateYesterday.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY)
-            yesterdayMarket.add(Calendar.DAY_OF_MONTH, -4);
-
-        // Default setting
-        else
-            yesterdayMarket.add(Calendar.DAY_OF_MONTH, -1);
-
-        // Adjust if today is Saturday
-        if (dateToday.get(Calendar.DAY_OF_WEEK) == Calendar.SATURDAY)
-            todayMarket.add(Calendar.DAY_OF_MONTH, -1);
-
-        // Adjust if today is Sunday
-        if (dateToday.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY)
-            todayMarket.add(Calendar.DAY_OF_MONTH, -2);
-
-        // Adjust if tomorrow is Saturday
-        if (dateTomorrow.get(Calendar.DAY_OF_WEEK) == Calendar.SATURDAY)
-            tomorrowMarket.add(Calendar.DAY_OF_MONTH, 3);
-
-        // Adjust if tomorrow is Sunday
-        else if (dateTomorrow.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY)
-            tomorrowMarket.add(Calendar.DAY_OF_MONTH, 2);
-
-        // Default setting
-        else
-            tomorrowMarket.add(Calendar.DAY_OF_MONTH, 1);
-
-        // Define Strings
         yesterday = dateFormat.format(yesterdayMarket.getTime());
         today = dateFormat.format(todayMarket.getTime());
         tomorrow = dateFormat.format(tomorrowMarket.getTime());
         custom = dateFormat.format(dateCustom.getTime());
 
+        // Fiscal quarter dates
         fiscalQtr1Str = "03/28/2016";
         fiscalQtr2Str = "06/28/2016";
         fiscalQtr3Str = "09/28/2016";
@@ -154,315 +138,77 @@ public class Dates {
         toDate.setTime(dateFormat.parse(today));
     }
 
-    public Calendar getDateToday() {
-        return dateToday;
-    }
-
-    public void setDateToday(Calendar dateToday) {
-        this.dateToday = dateToday;
-    }
-
-    public Calendar getDateTomorrow() {
-        return dateTomorrow;
-    }
-
-    public void setDateTomorrow(Calendar dateTomorrow) {
-        this.dateTomorrow = dateTomorrow;
-    }
-
-    public Calendar getDateCustom() {
-        return dateCustom;
-    }
-
-    public void setDateCustom(Calendar dateCustom) {
-        this.dateCustom = dateCustom;
-    }
-
-    public Calendar getDateYesterday() {
-        return dateYesterday;
-    }
-
-    public void setDateYesterday(Calendar dateYesterday) {
-        this.dateYesterday = dateYesterday;
-    }
-
-    public Calendar getFromDate() {
-        return fromDate;
-    }
-
-    public void setFromDate(Calendar fromDate) {
-        this.fromDate = fromDate;
-    }
-
-    public Calendar getToDate() {
-        return toDate;
-    }
-
-    public void setToDate(Calendar toDate) {
-        this.toDate = toDate;
-    }
-
-    public String getToday() {
-        return today;
-    }
-
-    public void setToday(String today) {
-        this.today = today;
-    }
-
-    public String getTomorrow() {
-        return tomorrow;
-    }
-
-    public void setTomorrow(String tomorrow) {
-        this.tomorrow = tomorrow;
-    }
-
-    public String getCustom() {
-        return custom;
-    }
-
-    public void setCustom(String custom) {
-        this.custom = custom;
-    }
-
-    public String getYesterday() {
-        return yesterday;
-    }
-
-    public void setYesterday(String yesterday) {
-        this.yesterday = yesterday;
-    }
-
-    public Calendar getYesterdayMarket() {
-        return yesterdayMarket;
-    }
-
-    public void setYesterdayMarket(Calendar yesterdayMarket) {
-        this.yesterdayMarket = yesterdayMarket;
-    }
-
-    public Calendar getTodayMarket() {
-        return todayMarket;
-    }
-
-    public void setTodayMarket(Calendar todayMarket) {
-        this.todayMarket = todayMarket;
-    }
-
-    public Calendar getTomorrowMarket() {
-        return tomorrowMarket;
-    }
-
-    public void setTomorrowMarket(Calendar tomorrowMarket) {
-        this.tomorrowMarket = tomorrowMarket;
-    }
-
-    public Calendar getFiscalQtr1() {
-        return fiscalQtr1;
-    }
-
-    public void setFiscalQtr1(Calendar fiscalQtr1) {
-        this.fiscalQtr1 = fiscalQtr1;
-    }
-
-    public Calendar getFiscalQtr2() {
-        return fiscalQtr2;
-    }
-
-    public void setFiscalQtr2(Calendar fiscalQtr2) {
-        this.fiscalQtr2 = fiscalQtr2;
-    }
-
-    public Calendar getFiscalQtr3() {
-        return fiscalQtr3;
-    }
-
-    public void setFiscalQtr3(Calendar fiscalQtr3) {
-        this.fiscalQtr3 = fiscalQtr3;
-    }
-
-    public Calendar getFiscalQtrPrevious() {
-        return fiscalQtrPrevious;
-    }
-
-    public void setFiscalQtrPrevious(Calendar fiscalQtrPrevious) {
-        this.fiscalQtrPrevious = fiscalQtrPrevious;
-    }
-
-    public Calendar getFiscalQtrCurrent() {
-        return fiscalQtrCurrent;
-    }
-
-    public void setFiscalQtrCurrent(Calendar fiscalQtrCurrent) {
-        this.fiscalQtrCurrent = fiscalQtrCurrent;
-    }
-
-    public String getFiscalQtr1Str() {
-        return fiscalQtr1Str;
-    }
-
-    public void setFiscalQtr1Str(String fiscalQtr1Str) {
-        this.fiscalQtr1Str = fiscalQtr1Str;
-    }
-
-    public String getFiscalQtr2Str() {
-        return fiscalQtr2Str;
-    }
-
-    public void setFiscalQtr2Str(String fiscalQtr2Str) {
-        this.fiscalQtr2Str = fiscalQtr2Str;
-    }
-
-    public String getFiscalQtr3Str() {
-        return fiscalQtr3Str;
-    }
-
-    public void setFiscalQtr3Str(String fiscalQtr3Str) {
-        this.fiscalQtr3Str = fiscalQtr3Str;
-    }
-
-    public String getFiscalQtrPreviousStr() {
-        return fiscalQtrPreviousStr;
-    }
-
-    public void setFiscalQtrPreviousStr(String fiscalQtrPreviousStr) {
-        this.fiscalQtrPreviousStr = fiscalQtrPreviousStr;
-    }
-
-    public String getFiscalQtrCurrentStr() {
-        return fiscalQtrCurrentStr;
-    }
-
-    public void setFiscalQtrCurrentStr(String fiscalQtrCurrentStr) {
-        this.fiscalQtrCurrentStr = fiscalQtrCurrentStr;
-    }
-
-    public String getCurrentMonth() {
-        return currentMonth;
-    }
-
-    public void setCurrentMonth(String currentMonth) {
-        this.currentMonth = currentMonth;
-    }
-
-    public String getCurrentDay() {
-        return currentDay;
-    }
-
-    public void setCurrentDay(String currentDay) {
-        this.currentDay = currentDay;
-    }
-
-    public String getCurrentYear() {
-        return currentYear;
-    }
-
-    public void setCurrentYear(String currentYear) {
-        this.currentYear = currentYear;
-    }
-
-    public String getFromMonth() {
-        return fromMonth;
-    }
-
-    public void setFromMonth(String fromMonth) {
-        this.fromMonth = fromMonth;
-    }
-
-    public String getFromDay() {
-        return fromDay;
-    }
-
-    public void setFromDay(String fromDay) {
-        this.fromDay = fromDay;
-    }
-
-    public String getFromYear() {
-        return fromYear;
-    }
-
-    public void setFromYear(String fromYear) {
-        this.fromYear = fromYear;
-    }
-
-    public DateFormat getMonthFormat() {
-        return monthFormat;
-    }
-
-    public void setMonthFormat(DateFormat monthFormat) {
-        this.monthFormat = monthFormat;
-    }
-
-    public DateFormat getDayFormat() {
-        return dayFormat;
-    }
-
-    public void setDayFormat(DateFormat dayFormat) {
-        this.dayFormat = dayFormat;
-    }
-
-    public DateFormat getYearFormat() {
-        return yearFormat;
-    }
-
-    public void setYearFormat(DateFormat yearFormat) {
-        this.yearFormat = yearFormat;
-    }
-
-    public DateFormat getDateFormat() {
-        return dateFormat;
-    }
-
-    public void setDateFormat(DateFormat dateFormat) {
-        this.dateFormat = dateFormat;
-    }
-
-    public DateFormat getZacksFormat() {
-        return zacksFormat;
-    }
-
-    public void setZacksFormat(DateFormat zacksFormat) {
-        this.zacksFormat = zacksFormat;
-    }
-
-    public DateFormat getNasdaqFormat() {
-        return nasdaqFormat;
-    }
-
-    public void setNasdaqFormat(DateFormat nasdaqFormat) {
-        this.nasdaqFormat = nasdaqFormat;
-    }
-
-    public DateFormat getYahooFormat() {
-        return yahooFormat;
-    }
-
-    public void setYahooFormat(DateFormat yahooFormat) {
-        this.yahooFormat = yahooFormat;
-    }
-
-    public DateFormat getYahooEarningsFormat() {
-        return yahooEarningsFormat;
-    }
-
-    public void setYahooEarningsFormat(DateFormat yahooEarningsFormat) {
-        this.yahooEarningsFormat = yahooEarningsFormat;
-    }
-
-    public DateFormat getMorningstarFormat() {
-        return morningstarFormat;
-    }
-
-    public void setMorningstarFormat(DateFormat morningstarFormat) {
-        this.morningstarFormat = morningstarFormat;
-    }
-
-    public DateFormat getTimeFormat() {
-        return timeFormat;
-    }
-
-    public void setTimeFormat(DateFormat timeFormat) {
-        this.timeFormat = timeFormat;
-    }
+    private int adjustForWeekend(DayOfWeek day, int defaultOffset) {
+        return switch (day) {
+            case SATURDAY -> -3;
+            case SUNDAY -> -4;
+            default -> defaultOffset;
+        };
+    }
+
+    private void adjustTodayMarket(DayOfWeek day) {
+        if (day == DayOfWeek.SATURDAY) todayMarket.add(Calendar.DAY_OF_MONTH, -1);
+        if (day == DayOfWeek.SUNDAY) todayMarket.add(Calendar.DAY_OF_MONTH, -2);
+    }
+
+    private void adjustTomorrowMarket(DayOfWeek day) {
+        switch (day) {
+            case SATURDAY -> tomorrowMarket.add(Calendar.DAY_OF_MONTH, 3);
+            case SUNDAY -> tomorrowMarket.add(Calendar.DAY_OF_MONTH, 2);
+            default -> tomorrowMarket.add(Calendar.DAY_OF_MONTH, 1);
+        }
+    }
+
+    // Getters
+    public Calendar getDateToday() { return dateToday; }
+    public Calendar getDateTomorrow() { return dateTomorrow; }
+    public Calendar getDateCustom() { return dateCustom; }
+    public Calendar getDateYesterday() { return dateYesterday; }
+    public Calendar getFromDate() { return fromDate; }
+    public Calendar getToDate() { return toDate; }
+    public String getToday() { return today; }
+    public String getTomorrow() { return tomorrow; }
+    public String getCustom() { return custom; }
+    public String getYesterday() { return yesterday; }
+    public Calendar getYesterdayMarket() { return yesterdayMarket; }
+    public Calendar getTodayMarket() { return todayMarket; }
+    public Calendar getTomorrowMarket() { return tomorrowMarket; }
+    public Calendar getFiscalQtr1() { return fiscalQtr1; }
+    public Calendar getFiscalQtr2() { return fiscalQtr2; }
+    public Calendar getFiscalQtr3() { return fiscalQtr3; }
+    public Calendar getFiscalQtrPrevious() { return fiscalQtrPrevious; }
+    public Calendar getFiscalQtrCurrent() { return fiscalQtrCurrent; }
+    public String getFiscalQtr1Str() { return fiscalQtr1Str; }
+    public String getFiscalQtr2Str() { return fiscalQtr2Str; }
+    public String getFiscalQtr3Str() { return fiscalQtr3Str; }
+    public String getFiscalQtrPreviousStr() { return fiscalQtrPreviousStr; }
+    public String getFiscalQtrCurrentStr() { return fiscalQtrCurrentStr; }
+    public String getCurrentMonth() { return currentMonth; }
+    public String getCurrentDay() { return currentDay; }
+    public String getCurrentYear() { return currentYear; }
+    public String getFromMonth() { return fromMonth; }
+    public String getFromDay() { return fromDay; }
+    public String getFromYear() { return fromYear; }
+    public DateFormat getMonthFormat() { return monthFormat; }
+    public DateFormat getDayFormat() { return dayFormat; }
+    public DateFormat getYearFormat() { return yearFormat; }
+    public DateFormat getDateFormat() { return dateFormat; }
+    public DateFormat getZacksFormat() { return zacksFormat; }
+    public DateFormat getNasdaqFormat() { return nasdaqFormat; }
+    public DateFormat getYahooFormat() { return yahooFormat; }
+    public DateFormat getYahooEarningsFormat() { return yahooEarningsFormat; }
+    public DateFormat getMorningstarFormat() { return morningstarFormat; }
+    public DateFormat getTimeFormat() { return timeFormat; }
+
+    // Setters for mutable state
+    public void setFiscalQtr1(Calendar v) { this.fiscalQtr1 = v; }
+    public void setFiscalQtr2(Calendar v) { this.fiscalQtr2 = v; }
+    public void setFiscalQtr3(Calendar v) { this.fiscalQtr3 = v; }
+    public void setFiscalQtrPrevious(Calendar v) { this.fiscalQtrPrevious = v; }
+    public void setFiscalQtrCurrent(Calendar v) { this.fiscalQtrCurrent = v; }
+    public void setFiscalQtr1Str(String v) { this.fiscalQtr1Str = v; }
+    public void setFiscalQtr2Str(String v) { this.fiscalQtr2Str = v; }
+    public void setFiscalQtr3Str(String v) { this.fiscalQtr3Str = v; }
+    public void setFiscalQtrPreviousStr(String v) { this.fiscalQtrPreviousStr = v; }
+    public void setFiscalQtrCurrentStr(String v) { this.fiscalQtrCurrentStr = v; }
 }

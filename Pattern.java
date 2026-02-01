@@ -8,193 +8,123 @@ import java.util.SortedSet;
 import java.util.TreeSet;
 
 import com.google.common.collect.ComparisonChain;
+import com.google.common.collect.HashMultimap;
 
-public class Pattern implements Comparator<Pattern> {
-	private String pattern, similar, offset;
-	private BigDecimal patternFreq, similarFreq, offsetFreq;
-	private BigDecimal accuracy;
-	private Set<String> patternSymbols, similarSymbols, offsetSymbols;
+public class Pattern implements Comparable<Pattern> {
 
-	public Pattern() {
-		//frequency.removeAll(Collections.singletonMap(key, value));
+    private String pattern;
+    private String similar;
+    private String offset;
+    private BigDecimal patternFreq;
+    private BigDecimal similarFreq;
+    private BigDecimal offsetFreq;
+    private BigDecimal accuracy;
+    private Set<String> patternSymbols;
+    private Set<String> similarSymbols;
+    private Set<String> offsetSymbols;
 
-		PatternCompare pc = new PatternCompare();
-		SortedSet<Pattern> sortedFreq =  new TreeSet<Pattern>(pc);
+    public Pattern() {
+        // Default constructor for use as data holder
+    }
 
-		for (String pattern : frequency.keySet()) {
-			String patternModified = pattern.substring(1, pattern.length() - 1);
+    public static void analyzeAndPrint(HashMultimap<String, String> frequency, BDCalculator bd) {
+        SortedSet<Pattern> sortedFreq = new TreeSet<>();
 
-			List<String> UpDownList = new ArrayList<String>(Arrays.asList(patternModified.split(", ")));
+        for (String patternKey : frequency.keySet()) {
+            String patternModified = patternKey.substring(1, patternKey.length() - 1);
+            List<String> upDownList = new ArrayList<>(Arrays.asList(patternModified.split(", ")));
 
-			int element = Integer.parseInt(UpDownList.get(0));
+            int element = Integer.parseInt(upDownList.getFirst());
+            upDownList.set(0, element == 1 ? "-1" : (element == -1 ? "1" : "0"));
 
-			if (element == 1)
-				UpDownList.set(0, "-1");
-			else if (element == -1)
-				UpDownList.set(0, "1");
+            String similarKey = upDownList.toString();
+            upDownList.removeFirst();
+            String offsetKey = upDownList.toString();
 
-			String similar = UpDownList.toString();
+            Set<String> patternSet = frequency.get(patternKey);
+            Set<String> similarSet = frequency.get(similarKey);
+            Set<String> offsetSet = frequency.get(offsetKey);
 
-			UpDownList.remove(0);
+            var patternFreq = BigDecimal.valueOf(patternSet.size());
+            var similarFreq = BigDecimal.valueOf(similarSet.size());
+            var offsetFreq = BigDecimal.valueOf(offsetSet.size());
 
-			String offset = UpDownList.toString();
+            var accuracy = new BigDecimal(bd.SetScaleTwo(
+                    bd.BDDivide(bd.BDMultiply(patternFreq, BigDecimal.valueOf(100)),
+                            bd.BDAdd(patternFreq, similarFreq))).toString());
 
-			int patternSize = frequency.get(pattern).size();
-			int similarSize = frequency.get(similar).size();
-			int offsetSize = frequency.get(offset).size();
+            var trend = new Pattern();
+            trend.setPattern(patternKey);
+            trend.setSimilar(similarKey);
+            trend.setOffset(offsetKey);
+            trend.setPatternFreq(patternFreq);
+            trend.setSimilarFreq(similarFreq);
+            trend.setOffsetFreq(offsetFreq);
+            trend.setAccuracy(accuracy);
+            trend.setPatternSymbols(patternSet);
+            trend.setSimilarSymbols(similarSet);
+            trend.setOffsetSymbols(offsetSet);
 
-			BigDecimal patternFreq = new BigDecimal(patternSize);
-			BigDecimal similarFreq = new BigDecimal(similarSize);
-			BigDecimal offsetFreq = new BigDecimal(offsetSize);
+            sortedFreq.add(trend);
+        }
+        printResults(sortedFreq);
+    }
 
-			BigDecimal accuracy = new BigDecimal(bd.SetScaleTwo(bd.BDDivide(bd.BDMultiply(patternFreq, BigDecimal.valueOf(100)), bd.BDAdd(patternFreq, similarFreq))).toString());
+    private static void printResults(SortedSet<Pattern> sortedFreq) {
+        System.out.println("Top 10 patterns");
+        System.out.printf("%-16s%-16s%-64s%s%n", "Frequency:", "Percentage:", "Pattern:", "Stocks:");
 
-			Set<String> patternSymbols = frequency.get(pattern);
-			Set<String> similarSymbols = frequency.get(similar);
-			Set<String> offsetSymbols = frequency.get(offset);
+        int i = 0;
+        for (Pattern entry : sortedFreq) {
+            if (++i > 10) break;
+            System.out.printf("%-16s%-16s%-64s%s%n",
+                    entry.getPatternFreq(),
+                    entry.getAccuracy() + "%",
+                    entry.getPattern(),
+                    entry.getPatternSymbols());
+        }
 
-			Pattern trend = new Pattern();
+        System.out.println();
+        System.out.println("Top 10 patterns offset by one day");
+        System.out.printf("%-16s%-16s%-64s%s%n", "Frequency:", "Percentage:", "Pattern:", "Stocks:");
 
-			trend.setPattern(pattern);
-			trend.setSimilar(similar);
-			trend.setOffset(offset);
-			trend.setPatternFreq(patternFreq);
-			trend.setSimilarFreq(similarFreq);
-			trend.setOffsetFreq(offsetFreq);
-			trend.setAccuracy(accuracy);
-			trend.setPatternSymbols(patternSymbols);
-			trend.setSimilarSymbols(similarSymbols);
-			trend.setOffsetSymbols(offsetSymbols);
+        int j = 0;
+        for (Pattern entry : sortedFreq) {
+            if (++j > 10) break;
+            System.out.printf("%-16s%-16s%-64s%s%n",
+                    entry.getOffsetFreq(),
+                    entry.getAccuracy() + "%",
+                    entry.getOffset(),
+                    entry.getOffsetSymbols());
+        }
+    }
 
-			sortedFreq.add(trend);
-		}
-		print(sortedFreq);
-	}
+    @Override
+    public int compareTo(Pattern other) {
+        return ComparisonChain.start()
+                .compare(other.getPatternFreq(), this.getPatternFreq())
+                .result();
+    }
 
-
-	public String getPattern() {
-		return pattern;
-	}
-	public void setPattern(String pattern) {
-		this.pattern = pattern;
-	}
-	public String getSimilar() {
-		return similar;
-	}
-	public void setSimilar(String similar) {
-		this.similar = similar;
-	}
-	public String getOffset() {
-		return offset;
-	}
-	public void setOffset(String offset) {
-		this.offset = offset;
-	}
-	public BigDecimal getPatternFreq() {
-		return patternFreq;
-	}
-	public void setPatternFreq(BigDecimal patternFreq) {
-		this.patternFreq = patternFreq;
-	}
-	public BigDecimal getSimilarFreq() {
-		return similarFreq;
-	}
-	public void setSimilarFreq(BigDecimal similarFreq) {
-		this.similarFreq = similarFreq;
-	}
-	public BigDecimal getOffsetFreq() {
-		return offsetFreq;
-	}
-	public void setOffsetFreq(BigDecimal offsetFreq) {
-		this.offsetFreq = offsetFreq;
-	}
-	public BigDecimal getAccuracy() {
-		return accuracy;
-	}
-	public void setAccuracy(BigDecimal accuracy) {
-		this.accuracy = accuracy;
-	}
-	public Set<String> getPatternSymbols() {
-		return patternSymbols;
-	}
-	public void setPatternSymbols(Set<String> patternSymbols) {
-		this.patternSymbols = patternSymbols;
-	}
-	public Set<String> getSimilarSymbols() {
-		return similarSymbols;
-	}
-	public void setSimilarSymbols(Set<String> similarSymbols) {
-		this.similarSymbols = similarSymbols;
-	}
-	public Set<String> getOffsetSymbols() {
-		return offsetSymbols;
-	}
-	public void setOffsetSymbols(Set<String> offsetSymbols) {
-		this.offsetSymbols = offsetSymbols;
-	}
-
-	@Override
-	public int compare(Pattern o1, Pattern o2) {
-		return ComparisonChain.start()
-				//.compare(i2.frequency, i1.frequency)
-				//.compare(o1.getAccuracy(), o2.getAccuracy())
-				.compare(o2.getPatternFreq(), o1.getPatternFreq())
-				//.compare(o2.getPattern(), o1.getPattern())
-				.result();
-	}
-	
-	public void print(SortedSet<Pattern> sortedFreq) {
-		// Result title
-		System.out.println("Top 10 patterns");
-
-		// Print column titles
-		System.out.println("Frequency:" + "\t" + "Percentage:" + "\t" + "Pattern:" + "\t\t\t\t\t\t\t" + "Stocks:");
-
-		int i = 1;
-		// Display top 10 occurrences
-		for (Pattern entry : sortedFreq) { 
-			if (i > 10)
-				break;
-
-			// Output results
-			//System.out.print(padRight("#" + i, 16));
-			System.out.print(padRight(entry.getPatternFreq().toString(), 16));
-			System.out.print(padRight(entry.getAccuracy() + "%", 16));
-			System.out.print(padRight(entry.getPattern(), 64));
-			System.out.println(entry.getPatternSymbols().toString());
-			i++;
-		}
-
-		// Print blank line
-		System.out.println();
-
-		// Result title
-		System.out.println("Top 10 patterns offset by one day");
-
-		// Print column titles
-		System.out.println("Frequency:" + "\t" + "Percentage:" + "\t" + "Pattern:" + "\t\t\t\t\t\t\t" + "Stocks:");
-
-		int j = 1;
-		// Display top 10 occurrences
-		for (Pattern entry : sortedFreq) { 
-			if (j > 10)
-				break;
-
-			// Output results
-			//System.out.print(padRight("#" + j, 16));
-			System.out.print(padRight(entry.getOffsetFreq().toString(), 16));
-			System.out.print(padRight(entry.getAccuracy() + "%", 16));
-			System.out.print(padRight(entry.getOffset(), 64));
-			System.out.println(entry.getOffsetSymbols().toString());
-			j++;
-		}
-	}
-
-	public String padRight(String s, int n) {
-		return String.format("%1$-" + n + "s", s);
-	}
-
-	public String padLeft(String s, int n) {
-		return String.format("%1$" + n + "s", s);
-	}
+    // Getters and setters
+    public String getPattern() { return pattern; }
+    public void setPattern(String pattern) { this.pattern = pattern; }
+    public String getSimilar() { return similar; }
+    public void setSimilar(String similar) { this.similar = similar; }
+    public String getOffset() { return offset; }
+    public void setOffset(String offset) { this.offset = offset; }
+    public BigDecimal getPatternFreq() { return patternFreq; }
+    public void setPatternFreq(BigDecimal patternFreq) { this.patternFreq = patternFreq; }
+    public BigDecimal getSimilarFreq() { return similarFreq; }
+    public void setSimilarFreq(BigDecimal similarFreq) { this.similarFreq = similarFreq; }
+    public BigDecimal getOffsetFreq() { return offsetFreq; }
+    public void setOffsetFreq(BigDecimal offsetFreq) { this.offsetFreq = offsetFreq; }
+    public BigDecimal getAccuracy() { return accuracy; }
+    public void setAccuracy(BigDecimal accuracy) { this.accuracy = accuracy; }
+    public Set<String> getPatternSymbols() { return patternSymbols; }
+    public void setPatternSymbols(Set<String> patternSymbols) { this.patternSymbols = patternSymbols; }
+    public Set<String> getSimilarSymbols() { return similarSymbols; }
+    public void setSimilarSymbols(Set<String> similarSymbols) { this.similarSymbols = similarSymbols; }
+    public Set<String> getOffsetSymbols() { return offsetSymbols; }
+    public void setOffsetSymbols(Set<String> offsetSymbols) { this.offsetSymbols = offsetSymbols; }
 }
