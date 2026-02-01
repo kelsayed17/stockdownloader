@@ -15,7 +15,7 @@ import java.util.logging.Logger;
  * Downloads and parses fundamental financial data from Morningstar,
  * returning a populated FinancialData model.
  */
-public class MorningstarClient {
+public final class MorningstarClient {
 
     private static final Logger LOGGER = Logger.getLogger(MorningstarClient.class.getName());
     private static final int MAX_RETRIES = 3;

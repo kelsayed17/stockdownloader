@@ -9,9 +9,8 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Path;
-import java.text.DateFormat;
-import java.text.SimpleDateFormat;
-import java.util.Calendar;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
@@ -80,9 +79,8 @@ public class StockListDownloader {
         }
     }
 
-    public void downloadYahooEarnings(Calendar calendar) {
-        DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
-        String date = dateFormat.format(calendar.getTime());
+    public void downloadYahooEarnings(LocalDate marketDate) {
+        String date = marketDate.format(DateTimeFormatter.ISO_LOCAL_DATE);
         String url = "https://finance.yahoo.com/calendar/earnings?day=" + date;
         ListMultimap<String, String> yahooEarnings = ArrayListMultimap.create();
 

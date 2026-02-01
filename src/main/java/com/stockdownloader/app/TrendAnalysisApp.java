@@ -21,7 +21,7 @@ public final class TrendAnalysisApp {
 
     private TrendAnalysisApp() {}
 
-    public static void main(String[] args) throws Exception {
+    public static void main(String[] args) {
         var stockList = new TreeSet<String>();
 
         var dates = new DateHelper();

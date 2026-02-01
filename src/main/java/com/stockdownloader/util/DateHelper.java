@@ -1,75 +1,39 @@
 package com.stockdownloader.util;
 
-import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.util.Calendar;
-import java.text.DateFormat;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
 
 /**
  * Date utility providing market-aware date calculations and multiple format support.
+ * Uses java.time exclusively for all date operations.
  */
-public class DateHelper {
+public final class DateHelper {
 
     public static final DateTimeFormatter STANDARD_FORMAT = DateTimeFormatter.ofPattern("MM/dd/yyyy");
     public static final DateTimeFormatter YAHOO_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
     public static final DateTimeFormatter YAHOO_EARNINGS_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd");
     public static final DateTimeFormatter MORNINGSTAR_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM");
 
-    private final Calendar yesterdayMarket;
-    private final Calendar todayMarket;
-    private final Calendar tomorrowMarket;
+    private static final DateTimeFormatter MONTH_FMT = DateTimeFormatter.ofPattern("MM");
+    private static final DateTimeFormatter DAY_FMT = DateTimeFormatter.ofPattern("dd");
+    private static final DateTimeFormatter YEAR_FMT = DateTimeFormatter.ofPattern("yyyy");
 
-    private final String today;
-    private final String tomorrow;
-    private final String yesterday;
-    private final String sixMonthsAgo;
+    private final LocalDate referenceDate;
+    private final LocalDate yesterdayMarket;
+    private final LocalDate todayMarket;
+    private final LocalDate tomorrowMarket;
+    private final LocalDate sixMonthsAgoDate;
 
-    private final String currentMonth;
-    private final String currentDay;
-    private final String currentYear;
-    private final String fromMonth;
-    private final String fromDay;
-    private final String fromYear;
+    public DateHelper() {
+        this(LocalDate.now());
+    }
 
-    private final DateFormat dateFormat;
-
-    public DateHelper() throws ParseException {
-        LocalDate now = LocalDate.now();
-        LocalDate tomorrowDate = now.plusDays(1);
-        LocalDate yesterdayDate = now.minusDays(1);
-        LocalDate customDate = now.minusMonths(6);
-
-        dateFormat = new SimpleDateFormat("MM/dd/yyyy");
-
-        yesterdayMarket = Calendar.getInstance();
-        todayMarket = Calendar.getInstance();
-        tomorrowMarket = Calendar.getInstance();
-
-        yesterdayMarket.add(Calendar.DAY_OF_MONTH, adjustForWeekend(yesterdayDate.getDayOfWeek(), -1));
-        adjustTodayMarket(now.getDayOfWeek());
-        adjustTomorrowMarket(tomorrowDate.getDayOfWeek());
-
-        yesterday = dateFormat.format(yesterdayMarket.getTime());
-        today = dateFormat.format(todayMarket.getTime());
-        tomorrow = dateFormat.format(tomorrowMarket.getTime());
-
-        Calendar dateCustom = Calendar.getInstance();
-        dateCustom.add(Calendar.MONTH, -6);
-        sixMonthsAgo = dateFormat.format(dateCustom.getTime());
-
-        DateTimeFormatter monthFmt = DateTimeFormatter.ofPattern("MM");
-        DateTimeFormatter dayFmt = DateTimeFormatter.ofPattern("dd");
-        DateTimeFormatter yearFmt = DateTimeFormatter.ofPattern("yyyy");
-
-        currentMonth = now.format(monthFmt);
-        currentDay = now.format(dayFmt);
-        currentYear = now.format(yearFmt);
-        fromMonth = customDate.format(monthFmt);
-        fromDay = customDate.format(dayFmt);
-        fromYear = customDate.format(yearFmt);
+    public DateHelper(LocalDate referenceDate) {
+        this.referenceDate = referenceDate;
+        this.todayMarket = adjustToMarketDay(referenceDate);
+        this.yesterdayMarket = adjustToMarketDay(referenceDate.minusDays(1));
+        this.tomorrowMarket = adjustToNextMarketDay(referenceDate.plusDays(1));
+        this.sixMonthsAgoDate = referenceDate.minusMonths(6);
     }
 
     public static LocalDate adjustToMarketDay(LocalDate date) {
@@ -80,39 +44,27 @@ public class DateHelper {
         };
     }
 
-    private int adjustForWeekend(DayOfWeek day, int defaultOffset) {
-        return switch (day) {
-            case SATURDAY -> -3;
-            case SUNDAY -> -4;
-            default -> defaultOffset;
+    private static LocalDate adjustToNextMarketDay(LocalDate date) {
+        return switch (date.getDayOfWeek()) {
+            case SATURDAY -> date.plusDays(2);
+            case SUNDAY -> date.plusDays(1);
+            default -> date;
         };
     }
 
-    private void adjustTodayMarket(DayOfWeek day) {
-        if (day == DayOfWeek.SATURDAY) todayMarket.add(Calendar.DAY_OF_MONTH, -1);
-        if (day == DayOfWeek.SUNDAY) todayMarket.add(Calendar.DAY_OF_MONTH, -2);
-    }
+    public LocalDate getYesterdayMarket() { return yesterdayMarket; }
+    public LocalDate getTodayMarket() { return todayMarket; }
+    public LocalDate getTomorrowMarket() { return tomorrowMarket; }
 
-    private void adjustTomorrowMarket(DayOfWeek day) {
-        switch (day) {
-            case SATURDAY -> tomorrowMarket.add(Calendar.DAY_OF_MONTH, 3);
-            case SUNDAY -> tomorrowMarket.add(Calendar.DAY_OF_MONTH, 2);
-            default -> tomorrowMarket.add(Calendar.DAY_OF_MONTH, 1);
-        }
-    }
+    public String getToday() { return todayMarket.format(STANDARD_FORMAT); }
+    public String getTomorrow() { return tomorrowMarket.format(STANDARD_FORMAT); }
+    public String getYesterday() { return yesterdayMarket.format(STANDARD_FORMAT); }
+    public String getSixMonthsAgo() { return sixMonthsAgoDate.format(STANDARD_FORMAT); }
 
-    public Calendar getYesterdayMarket() { return yesterdayMarket; }
-    public Calendar getTodayMarket() { return todayMarket; }
-    public Calendar getTomorrowMarket() { return tomorrowMarket; }
-    public String getToday() { return today; }
-    public String getTomorrow() { return tomorrow; }
-    public String getYesterday() { return yesterday; }
-    public String getSixMonthsAgo() { return sixMonthsAgo; }
-    public String getCurrentMonth() { return currentMonth; }
-    public String getCurrentDay() { return currentDay; }
-    public String getCurrentYear() { return currentYear; }
-    public String getFromMonth() { return fromMonth; }
-    public String getFromDay() { return fromDay; }
-    public String getFromYear() { return fromYear; }
-    public DateFormat getDateFormat() { return dateFormat; }
+    public String getCurrentMonth() { return referenceDate.format(MONTH_FMT); }
+    public String getCurrentDay() { return referenceDate.format(DAY_FMT); }
+    public String getCurrentYear() { return referenceDate.format(YEAR_FMT); }
+    public String getFromMonth() { return sixMonthsAgoDate.format(MONTH_FMT); }
+    public String getFromDay() { return sixMonthsAgoDate.format(DAY_FMT); }
+    public String getFromYear() { return sixMonthsAgoDate.format(YEAR_FMT); }
 }

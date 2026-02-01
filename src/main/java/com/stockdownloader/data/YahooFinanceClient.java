@@ -16,7 +16,7 @@ import java.util.logging.Logger;
  * Downloads real-time stock quote data from Yahoo Finance CSV API
  * and returns a populated QuoteData model.
  */
-public class YahooFinanceClient {
+public final class YahooFinanceClient {
 
     private static final Logger LOGGER = Logger.getLogger(YahooFinanceClient.class.getName());
     private static final int MAX_RETRIES = 3;
