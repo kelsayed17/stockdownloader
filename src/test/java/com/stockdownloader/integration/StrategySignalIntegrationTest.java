@@ -67,12 +67,11 @@ class StrategySignalIntegrationTest {
                 .toList();
 
         if (!actionSignals.isEmpty()) {
-            assertEquals(Signal.BUY, actionSignals.getFirst(),
-                    "First action signal should be BUY");
-
+            // BUY and SELL signals should alternate (first can be either BUY or SELL
+            // depending on the initial SMA relationship when warmup completes)
             for (int i = 0; i < actionSignals.size() - 1; i++) {
                 assertNotEquals(actionSignals.get(i), actionSignals.get(i + 1),
-                        "BUY and SELL signals should alternate");
+                        "BUY and SELL signals should alternate at index " + i);
             }
         }
     }

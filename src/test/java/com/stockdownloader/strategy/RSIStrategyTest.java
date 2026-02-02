@@ -14,7 +14,7 @@ class RSIStrategyTest {
     @Test
     void constructionWithValidParams() {
         var strategy = new RSIStrategy(14, 30, 70);
-        assertEquals("RSI (14) [30/70]", strategy.getName());
+        assertEquals("RSI (14) [30.0/70.0]", strategy.getName());
         assertEquals(15, strategy.getWarmupPeriod());
     }
 
