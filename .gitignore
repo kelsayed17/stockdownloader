@@ -1,9 +1,22 @@
 # Build output
 build/
 target/
+dist/
+*.egg-info/
 
 # Gradle
 .gradle/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.venv/
+venv/
+*.egg
+.eggs/
 
 # IDE
 .idea/
