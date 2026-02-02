@@ -8,10 +8,8 @@ import com.stockdownloader.data.YahooQuoteClient;
 import com.stockdownloader.model.PriceData;
 import com.stockdownloader.strategy.*;
 
-import java.io.InputStream;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Level;
@@ -88,14 +86,11 @@ public final class SPYBacktestApp {
                 long endDate = System.currentTimeMillis() / 1000;
                 long startDate = endDate - FIVE_YEARS_IN_SECONDS;
 
-                String url = "https://query1.finance.yahoo.com/v7/finance/download/SPY?period1=%d&period2=%d&interval=1d&events=history&crumb=%s"
-                        .formatted(startDate, endDate, crumb);
+                client.downloadData("SPY", startDate, endDate, crumb);
 
-                try (InputStream input = URI.create(url).toURL().openStream()) {
-                    List<PriceData> data = CsvPriceDataLoader.loadFromStream(input);
-                    System.out.println("Downloaded " + data.size() + " days of SPY data");
-                    return data;
-                }
+                List<PriceData> data = CsvPriceDataLoader.loadFromFile("SPY.csv");
+                System.out.println("Downloaded " + data.size() + " days of SPY data");
+                return data;
             } else {
                 System.out.println("Could not obtain Yahoo Finance authentication crumb.");
             }

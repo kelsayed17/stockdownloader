@@ -7,49 +7,43 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.util.Arrays;
-import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import org.apache.commons.lang3.StringEscapeUtils;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
-import org.apache.http.client.CookieStore;
-import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
-import org.apache.http.client.protocol.HttpClientContext;
 import org.apache.http.client.utils.HttpClientUtils;
-import org.apache.http.impl.client.BasicCookieStore;
-import org.apache.http.impl.client.HttpClientBuilder;
 
 /**
- * HTTP client for Yahoo Finance that handles authentication crumb extraction
- * and historical CSV data downloads.
+ * HTTP client for Yahoo Finance that handles authentication via the modern
+ * cookie/crumb flow (fc.yahoo.com + /v1/test/getcrumb) and historical
+ * CSV data downloads.
+ *
+ * Replaces the legacy crumb extraction that parsed "CrumbStore" from
+ * Yahoo Finance page HTML, which no longer works.
  */
 public final class YahooQuoteClient {
 
     private static final Logger LOGGER = Logger.getLogger(YahooQuoteClient.class.getName());
-    private static final String USER_AGENT = "Mozilla/5.0 (X11; U; Linux x86_64; en-US; rv:1.9.2.13) " +
-            "Gecko/20101206 Ubuntu/10.10 (maverick) Firefox/3.6.13";
 
-    private final HttpClient client;
-    private final HttpClientContext context;
+    private final YahooAuthHelper auth;
 
     public YahooQuoteClient() {
-        CookieStore cookieStore = new BasicCookieStore();
-        this.client = HttpClientBuilder.create().build();
-        this.context = HttpClientContext.create();
-        context.setCookieStore(cookieStore);
+        this(new YahooAuthHelper());
+    }
+
+    public YahooQuoteClient(YahooAuthHelper auth) {
+        this.auth = auth;
     }
 
     public String getPage(String symbol) {
-        String url = "https://finance.yahoo.com/quote/%s/?p=%s".formatted(symbol, symbol);
+        String url = "https://finance.yahoo.com/quote/%s/".formatted(symbol);
         var request = new HttpGet(url);
-        request.addHeader("User-Agent", USER_AGENT);
+        request.addHeader("User-Agent", auth.getUserAgent());
 
         try {
-            HttpResponse response = client.execute(request, context);
+            HttpResponse response = auth.getClient().execute(request, auth.getContext());
             try (var rd = new BufferedReader(new InputStreamReader(response.getEntity().getContent()))) {
                 var result = new StringBuilder();
                 String line;
@@ -66,17 +60,13 @@ public final class YahooQuoteClient {
         return null;
     }
 
+    /**
+     * Obtains a crumb for Yahoo Finance API authentication using the modern
+     * fc.yahoo.com cookie flow instead of the deprecated CrumbStore page scraping.
+     */
     public String getCrumb(String symbol) {
-        String page = getPage(symbol);
-        if (page == null) return "";
-
-        List<String> lines = Arrays.asList(page.split("}"));
-        for (String l : lines) {
-            if (l.contains("CrumbStore")) {
-                String[] vals = l.split(":");
-                String crumb = vals[2].replace("\"", "");
-                return StringEscapeUtils.unescapeJava(crumb);
-            }
+        if (auth.authenticate()) {
+            return auth.getCrumb();
         }
         return "";
     }
@@ -87,10 +77,10 @@ public final class YahooQuoteClient {
                 .formatted(symbol, startDate, endDate, crumb);
 
         var request = new HttpGet(url);
-        request.addHeader("User-Agent", USER_AGENT);
+        request.addHeader("User-Agent", auth.getUserAgent());
 
         try {
-            HttpResponse response = client.execute(request, context);
+            HttpResponse response = auth.getClient().execute(request, auth.getContext());
             HttpEntity entity = response.getEntity();
             if (entity != null) {
                 try (var bis = new BufferedInputStream(entity.getContent());
@@ -102,5 +92,12 @@ public final class YahooQuoteClient {
         } catch (IOException ex) {
             LOGGER.log(Level.WARNING, "Failed to download data for symbol: {0}", symbol);
         }
+    }
+
+    /**
+     * Returns the shared auth helper for use with other clients.
+     */
+    public YahooAuthHelper getAuth() {
+        return auth;
     }
 }
