@@ -19,6 +19,7 @@ dependencies {
     implementation files('/opt/gradle-8.14.3/lib/commons-lang3-3.14.0.jar')
     implementation files('/opt/gradle-8.14.3/lib/commons-io-2.15.1.jar')
     implementation files('/opt/gradle-8.14.3/lib/jsoup-1.15.3.jar')
+    implementation files('/opt/gradle-8.14.3/lib/gson-2.10.jar')
 
     testImplementation files('/usr/share/java/junit-jupiter-api-5.10.1.jar')
     testImplementation files('/usr/share/java/junit-jupiter-params-5.10.1.jar')

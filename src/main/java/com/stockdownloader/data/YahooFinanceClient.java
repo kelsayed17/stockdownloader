@@ -3,83 +3,149 @@ package com.stockdownloader.data;
 import com.stockdownloader.model.QuoteData;
 import com.stockdownloader.util.RetryExecutor;
 
-import com.stockdownloader.util.CsvParser;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 
-import java.io.IOException;
-import java.io.InputStream;
+import org.apache.http.HttpResponse;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.utils.HttpClientUtils;
+
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
 import java.math.BigDecimal;
-import java.net.URI;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Downloads real-time stock quote data from Yahoo Finance CSV API
+ * Downloads real-time stock quote data from Yahoo Finance v7 quote JSON API
  * and returns a populated QuoteData model.
+ *
+ * Replaces the deprecated download.finance.yahoo.com/d/quotes.csv endpoint
+ * which was shut down in 2017.
  */
 public final class YahooFinanceClient {
 
     private static final Logger LOGGER = Logger.getLogger(YahooFinanceClient.class.getName());
     private static final int MAX_RETRIES = 3;
+    private static final String QUOTE_URL = "https://query1.finance.yahoo.com/v7/finance/quote?symbols=%s";
+
+    private final YahooAuthHelper auth;
+
+    public YahooFinanceClient() {
+        this(new YahooAuthHelper());
+    }
+
+    public YahooFinanceClient(YahooAuthHelper auth) {
+        this.auth = auth;
+    }
 
     public QuoteData download(String ticker) {
         var data = new QuoteData();
 
-        String tags = "h0g0v0o0d1d2m3m4k2p0p5d0e0e8l1k0j0w0s6j1j2";
-        String url = "http://download.finance.yahoo.com/d/quotes.csv?s=" + ticker + "&f=" + tags + "&e=.csv";
+        if (auth.getCrumb() == null) {
+            auth.authenticate();
+        }
 
         RetryExecutor.execute(() -> {
-            try (InputStream input = URI.create(url).toURL().openStream()) {
-                parseQuote(input, tags, data);
-            } catch (ArrayIndexOutOfBoundsException e) {
-                LOGGER.log(Level.WARNING, "{0} has incomplete Yahoo finance data.", ticker);
-                data.setIncomplete(true);
+            String url = (QUOTE_URL + "&crumb=%s").formatted(ticker, auth.getCrumb());
+
+            var request = new HttpGet(url);
+            request.addHeader("User-Agent", auth.getUserAgent());
+
+            HttpResponse response = auth.getClient().execute(request, auth.getContext());
+            try (var reader = new BufferedReader(
+                    new InputStreamReader(response.getEntity().getContent()))) {
+                var sb = new StringBuilder();
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    sb.append(line);
+                }
+                parseQuoteJson(sb.toString(), data);
+            } finally {
+                HttpClientUtils.closeQuietly(response);
             }
         }, MAX_RETRIES, LOGGER, "Yahoo Finance download for " + ticker);
 
         return data;
     }
 
-    private void parseQuote(InputStream input, String tags, QuoteData data) throws IOException {
-        try (var parser = new CsvParser(input)) {
-            String[] nextLine;
-            while ((nextLine = parser.readNext()) != null) {
-                data.setPriceSales(parseBigDecimal(nextLine[tags.indexOf("p5") / 2]));
-                data.setTrailingAnnualDividendYield(parseBigDecimal(nextLine[tags.indexOf("d0") / 2]));
-                data.setDilutedEPS(parseBigDecimal(nextLine[tags.indexOf("e0") / 2]));
-                data.setEpsEstimateNextYear(parseBigDecimal(nextLine[tags.indexOf("e8") / 2]));
-                data.setLastTradePriceOnly(parseBigDecimal(nextLine[tags.indexOf("l1") / 2]));
-                data.setYearHigh(parseBigDecimal(nextLine[tags.indexOf("k0") / 2]));
-                data.setYearLow(parseBigDecimal(nextLine[tags.indexOf("j0") / 2]));
-                data.setFiftyDayMovingAverage(parseBigDecimal(nextLine[tags.indexOf("m3") / 2]));
-                data.setTwoHundredDayMovingAverage(parseBigDecimal(nextLine[tags.indexOf("m4") / 2]));
-                data.setPreviousClose(parseBigDecimal(nextLine[tags.indexOf("p0") / 2]));
-                data.setOpen(parseBigDecimal(nextLine[tags.indexOf("o0") / 2]));
-                data.setDaysHigh(parseBigDecimal(nextLine[tags.indexOf("h0") / 2]));
-                data.setDaysLow(parseBigDecimal(nextLine[tags.indexOf("g0") / 2]));
-                data.setVolume(parseBigDecimal(nextLine[tags.indexOf("v0") / 2]));
-                data.setYearRange(nextLine[tags.indexOf("w0") / 2]);
+    private void parseQuoteJson(String json, QuoteData data) {
+        try {
+            JsonObject root = JsonParser.parseString(json).getAsJsonObject();
+            JsonObject quoteResponse = root.getAsJsonObject("quoteResponse");
 
-                String marketCapStr = nextLine[tags.indexOf("j1") / 2];
-                data.setMarketCapitalizationStr(marketCapStr);
-                data.setMarketCapitalization(parseMarketCap(marketCapStr));
-
-                if (data.getLastTradePriceOnly().compareTo(data.getYearLow()) < 0) {
-                    data.setYearLow(data.getLastTradePriceOnly());
-                }
+            if (quoteResponse == null || quoteResponse.getAsJsonArray("result").isEmpty()) {
+                LOGGER.log(Level.WARNING, "Empty quote response from Yahoo Finance");
+                data.setIncomplete(true);
+                return;
             }
+
+            JsonObject quote = quoteResponse.getAsJsonArray("result").get(0).getAsJsonObject();
+
+            data.setPriceSales(getDecimal(quote, "priceToSalesTrailing12Months"));
+            data.setTrailingAnnualDividendYield(getDecimal(quote, "trailingAnnualDividendYield"));
+            data.setDilutedEPS(getDecimal(quote, "epsTrailingTwelveMonths"));
+            data.setEpsEstimateNextYear(getDecimal(quote, "epsForward"));
+            data.setLastTradePriceOnly(getDecimal(quote, "regularMarketPrice"));
+            data.setYearHigh(getDecimal(quote, "fiftyTwoWeekHigh"));
+            data.setYearLow(getDecimal(quote, "fiftyTwoWeekLow"));
+            data.setFiftyDayMovingAverage(getDecimal(quote, "fiftyDayAverage"));
+            data.setTwoHundredDayMovingAverage(getDecimal(quote, "twoHundredDayAverage"));
+            data.setPreviousClose(getDecimal(quote, "regularMarketPreviousClose"));
+            data.setOpen(getDecimal(quote, "regularMarketOpen"));
+            data.setDaysHigh(getDecimal(quote, "regularMarketDayHigh"));
+            data.setDaysLow(getDecimal(quote, "regularMarketDayLow"));
+            data.setVolume(getDecimal(quote, "regularMarketVolume"));
+
+            String range = getString(quote, "fiftyTwoWeekRange");
+            data.setYearRange(range);
+
+            long marketCap = getLong(quote, "marketCap");
+            data.setMarketCapitalization(marketCap);
+            data.setMarketCapitalizationStr(formatMarketCap(marketCap));
+
+            if (data.getLastTradePriceOnly().compareTo(data.getYearLow()) < 0) {
+                data.setYearLow(data.getLastTradePriceOnly());
+            }
+        } catch (Exception e) {
+            LOGGER.log(Level.WARNING, "Error parsing Yahoo Finance quote JSON: {0}", e.getMessage());
+            data.setIncomplete(true);
         }
     }
 
-    private static BigDecimal parseBigDecimal(String value) {
-        return "N/A".equals(value) ? BigDecimal.ZERO : new BigDecimal(value);
+    private static BigDecimal getDecimal(JsonObject obj, String field) {
+        JsonElement el = obj.get(field);
+        if (el == null || el.isJsonNull()) return BigDecimal.ZERO;
+        try {
+            return new BigDecimal(el.getAsString());
+        } catch (NumberFormatException e) {
+            return BigDecimal.ZERO;
+        }
     }
 
-    private static long parseMarketCap(String value) {
-        if (value.contains("M")) {
-            return (long) (Double.parseDouble(value.replace("M", "")) * 1_000_000);
-        } else if (value.contains("B")) {
-            return (long) (Double.parseDouble(value.replace("B", "")) * 1_000_000_000);
+    private static long getLong(JsonObject obj, String field) {
+        JsonElement el = obj.get(field);
+        if (el == null || el.isJsonNull()) return 0;
+        try {
+            return el.getAsLong();
+        } catch (NumberFormatException e) {
+            return 0;
         }
-        return 0;
+    }
+
+    private static String getString(JsonObject obj, String field) {
+        JsonElement el = obj.get(field);
+        if (el == null || el.isJsonNull()) return "";
+        return el.getAsString();
+    }
+
+    private static String formatMarketCap(long marketCap) {
+        if (marketCap >= 1_000_000_000L) {
+            return "%.2fB".formatted(marketCap / 1_000_000_000.0);
+        } else if (marketCap >= 1_000_000L) {
+            return "%.2fM".formatted(marketCap / 1_000_000.0);
+        }
+        return String.valueOf(marketCap);
     }
 }
