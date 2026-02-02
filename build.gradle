@@ -20,8 +20,16 @@ dependencies {
     implementation files('/opt/gradle-8.14.3/lib/commons-io-2.15.1.jar')
     implementation files('/opt/gradle-8.14.3/lib/jsoup-1.15.3.jar')
 
-    testImplementation 'org.junit.jupiter:junit-jupiter:5.11.3'
-    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    testImplementation files('/usr/share/java/junit-jupiter-api-5.10.1.jar')
+    testImplementation files('/usr/share/java/junit-jupiter-params-5.10.1.jar')
+    testImplementation files('/usr/share/java/junit-platform-commons-1.9.1.jar')
+    testImplementation files('/usr/share/java/junit-platform-engine-1.9.1.jar')
+    testImplementation files('/usr/share/java/junit-platform-launcher-1.9.1.jar')
+    testImplementation files('/usr/share/java/junit-platform-suite-api-1.9.1.jar')
+    testRuntimeOnly files('/usr/share/java/junit-jupiter-engine-5.10.1.jar')
+    testRuntimeOnly files('/usr/share/java/junit-platform-reporting-1.9.1.jar')
+    testImplementation files('/usr/share/java/opentest4j-1.2.0.jar',
+                            '/usr/share/java/apiguardian-api-1.1.2.jar')
 }
 
 tasks.named('test') {

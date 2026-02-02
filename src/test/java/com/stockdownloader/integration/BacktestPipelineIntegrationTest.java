@@ -83,7 +83,7 @@ class BacktestPipelineIntegrationTest {
         BacktestResult result = engine.run(strategy, priceData);
 
         assertNotNull(result);
-        assertEquals("RSI (14) [30/70]", result.getStrategyName());
+        assertEquals("RSI (14) [30.0/70.0]", result.getStrategyName());
         assertTrue(result.getFinalCapital().compareTo(BigDecimal.ZERO) > 0);
 
         // Verify metrics are computable without error
@@ -189,8 +189,8 @@ class BacktestPipelineIntegrationTest {
         BigDecimal firstClose = priceData.getFirst().close();
         BigDecimal lastClose = priceData.getLast().close();
         BigDecimal expectedReturn = lastClose.subtract(firstClose)
-                .multiply(new BigDecimal("100"))
-                .divide(firstClose, 6, java.math.RoundingMode.HALF_UP);
+                .divide(firstClose, 6, java.math.RoundingMode.HALF_UP)
+                .multiply(new BigDecimal("100"));
 
         assertEquals(0, expectedReturn.compareTo(buyAndHold),
                 "Buy and hold return should match manual calculation");

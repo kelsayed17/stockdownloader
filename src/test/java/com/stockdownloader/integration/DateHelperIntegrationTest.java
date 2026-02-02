@@ -136,7 +136,7 @@ class DateHelperIntegrationTest {
     @Test
     void defaultConstructorDoesNotThrow() {
         // The refactored DateHelper constructor no longer throws ParseException
-        assertDoesNotThrow(DateHelper::new);
+        assertDoesNotThrow(() -> new DateHelper());
     }
 
     @Test
