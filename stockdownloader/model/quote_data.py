@@ -1,0 +1,21 @@
+class QuoteData:
+    def __init__(self) -> None:
+        self.price_sales: float = 0.0
+        self.trailing_annual_dividend_yield: float = 0.0
+        self.diluted_eps: float = 0.0
+        self.eps_estimate_next_year: float = 0.0
+        self.last_trade_price_only: float = 0.0
+        self.year_high: float = 0.0
+        self.year_low: float = 0.0
+        self.fifty_day_moving_average: float = 0.0
+        self.two_hundred_day_moving_average: float = 0.0
+        self.previous_close: float = 0.0
+        self.open: float = 0.0
+        self.days_high: float = 0.0
+        self.days_low: float = 0.0
+        self.volume: float = 0.0
+        self.year_range: str = ""
+        self.market_capitalization_str: str = ""
+        self.market_capitalization: int = 0
+        self.incomplete: bool = False
+        self.error: bool = False

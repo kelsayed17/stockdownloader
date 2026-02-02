@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=75.0.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "stockdownloader"
+version = "1.0.0"
+description = "Stock market analysis and backtesting toolkit"
+requires-python = ">=3.12"
+dependencies = [
+    "requests>=2.32.0",
+    "beautifulsoup4>=4.12.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+]
+
+[tool.setuptools.packages.find]
+include = ["stockdownloader*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
