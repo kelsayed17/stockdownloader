@@ -14,9 +14,6 @@ import com.stockdownloader.util.MovingAverageCalculator;
 
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestMethodOrder;
-import org.junit.jupiter.api.MethodOrderer;
-import org.junit.jupiter.api.Order;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
@@ -44,7 +41,6 @@ import static org.junit.jupiter.api.Assertions.*;
  * Exercises: CsvParser, CsvPriceDataLoader, PriceData, Trade, BacktestEngine,
  * BacktestResult, all strategy implementations, MovingAverageCalculator.
  */
-@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class DataPipelineAndTradeLifecycleE2ETest {
 
     private static List<PriceData> realData;
@@ -59,7 +55,6 @@ class DataPipelineAndTradeLifecycleE2ETest {
     // ========== CsvParser -> CsvPriceDataLoader Pipeline ==========
 
     @Test
-    @Order(1)
     void csvParserToLoaderPipeline() throws Exception {
         // Manually construct CSV and verify it flows through the full parsing pipeline
         String csv = """
@@ -83,7 +78,6 @@ class DataPipelineAndTradeLifecycleE2ETest {
     }
 
     @Test
-    @Order(2)
     void csvParserHandlesRealDataFormat() throws Exception {
         // Verify CsvParser correctly parses actual Yahoo Finance CSV format
         InputStream stream = getClass().getResourceAsStream("/test-price-data.csv");
@@ -105,14 +99,13 @@ class DataPipelineAndTradeLifecycleE2ETest {
             assertNotNull(firstRow);
             assertEquals("2023-01-03", firstRow[0]);
             // Verify values are parseable as numbers
-            assertDoesNotThrow(() -> new BigDecimal(firstRow[1]));
-            assertDoesNotThrow(() -> new BigDecimal(firstRow[4]));
-            assertDoesNotThrow(() -> Long.parseLong(firstRow[6]));
+            new BigDecimal(firstRow[1]);
+            new BigDecimal(firstRow[4]);
+            Long.parseLong(firstRow[6]);
         }
     }
 
     @Test
-    @Order(3)
     void csvParserWithTabSeparator() throws Exception {
         String tsv = "Col1\tCol2\tCol3\nA\tB\tC\nD\tE\tF";
         try (var parser = new CsvParser(new StringReader(tsv), '\t')) {
@@ -128,7 +121,6 @@ class DataPipelineAndTradeLifecycleE2ETest {
     }
 
     @Test
-    @Order(4)
     void csvParserHandlesQuotedFields() throws Exception {
         String csv = "Name,Value\n\"Smith, John\",100\n\"O'Brien\",200";
         try (var parser = new CsvParser(new StringReader(csv))) {
@@ -140,7 +132,6 @@ class DataPipelineAndTradeLifecycleE2ETest {
     }
 
     @Test
-    @Order(5)
     void csvParserReadAllReturnsAllRows() throws Exception {
         String csv = "A,B\n1,2\n3,4\n5,6";
         try (var parser = new CsvParser(new StringReader(csv))) {
@@ -150,7 +141,6 @@ class DataPipelineAndTradeLifecycleE2ETest {
     }
 
     @Test
-    @Order(6)
     void csvParserSkipLines() throws Exception {
         String csv = "Header1\nHeader2\nData1,A\nData2,B";
         try (var parser = new CsvParser(new StringReader(csv))) {
@@ -161,7 +151,6 @@ class DataPipelineAndTradeLifecycleE2ETest {
     }
 
     @Test
-    @Order(7)
     void loaderSkipsInvalidNumericRows() {
         String csv = "Date,Open,High,Low,Close,Adj Close,Volume\n"
                 + "2024-01-02,100.00,105.00,99.00,103.50,103.50,5000000\n"
@@ -177,7 +166,6 @@ class DataPipelineAndTradeLifecycleE2ETest {
     }
 
     @Test
-    @Order(8)
     void loaderHandlesMissingAdjCloseAndVolume() {
         String csv = "Date,Open,High,Low,Close\n"
                 + "2024-01-02,100.00,105.00,99.00,103.50\n";
@@ -194,7 +182,6 @@ class DataPipelineAndTradeLifecycleE2ETest {
     // ========== Data -> Strategy Signal Pipeline ==========
 
     @Test
-    @Order(9)
     void dataToSignalPipelineSMA() {
         var strategy = new SMACrossoverStrategy(20, 50);
 
@@ -222,7 +209,6 @@ class DataPipelineAndTradeLifecycleE2ETest {
     }
 
     @Test
-    @Order(10)
     void dataToSignalPipelineRSI() {
         var strategy = new RSIStrategy(14, 30, 70);
 
@@ -243,7 +229,6 @@ class DataPipelineAndTradeLifecycleE2ETest {
     }
 
     @Test
-    @Order(11)
     void dataToSignalPipelineMACD() {
         var strategy = new MACDStrategy(12, 26, 9);
 
@@ -264,7 +249,6 @@ class DataPipelineAndTradeLifecycleE2ETest {
     // ========== Trade Lifecycle E2E ==========
 
     @Test
-    @Order(12)
     void tradeCreationAndClosure() {
         Trade trade = new Trade(Trade.Direction.LONG, "2024-01-02",
                 new BigDecimal("100.00"), 50);
@@ -291,7 +275,6 @@ class DataPipelineAndTradeLifecycleE2ETest {
     }
 
     @Test
-    @Order(13)
     void tradeLosingPosition() {
         Trade trade = new Trade(Trade.Direction.LONG, "2024-01-02",
                 new BigDecimal("100.00"), 100);
@@ -304,19 +287,17 @@ class DataPipelineAndTradeLifecycleE2ETest {
     }
 
     @Test
-    @Order(14)
     void tradeCannotBeClosedTwice() {
         Trade trade = new Trade(Trade.Direction.LONG, "2024-01-02",
                 new BigDecimal("100.00"), 10);
         trade.close("2024-01-10", new BigDecimal("110.00"));
 
-        assertThrows(IllegalStateException.class,
-                () -> trade.close("2024-01-15", new BigDecimal("120.00")),
-                "Should not allow closing an already closed trade");
+        assertThrows(IllegalStateException.class, () -> {
+            trade.close("2024-01-15", new BigDecimal("120.00"));
+        });
     }
 
     @Test
-    @Order(15)
     void tradeShortDirection() {
         Trade trade = new Trade(Trade.Direction.SHORT, "2024-01-02",
                 new BigDecimal("100.00"), 50);
@@ -329,7 +310,6 @@ class DataPipelineAndTradeLifecycleE2ETest {
     }
 
     @Test
-    @Order(16)
     void tradeToStringFormat() {
         Trade trade = new Trade(Trade.Direction.LONG, "2024-01-02",
                 new BigDecimal("100.00"), 10);
@@ -347,7 +327,6 @@ class DataPipelineAndTradeLifecycleE2ETest {
     // ========== Engine -> Trade -> Result Full Lifecycle ==========
 
     @Test
-    @Order(17)
     void engineProducesClosedTradesWithValidLifecycle() {
         var engine = new BacktestEngine(new BigDecimal("100000"), BigDecimal.ZERO);
         var strategy = new SMACrossoverStrategy(20, 50);
@@ -384,7 +363,6 @@ class DataPipelineAndTradeLifecycleE2ETest {
     }
 
     @Test
-    @Order(18)
     void engineTradeEntryDatesMatchDataDates() {
         var engine = new BacktestEngine(new BigDecimal("100000"), BigDecimal.ZERO);
         var strategy = new MACDStrategy(12, 26, 9);
@@ -403,7 +381,6 @@ class DataPipelineAndTradeLifecycleE2ETest {
     }
 
     @Test
-    @Order(19)
     void engineTradeEntryPricesMatchClosePrices() {
         var engine = new BacktestEngine(new BigDecimal("100000"), BigDecimal.ZERO);
         var strategy = new SMACrossoverStrategy(20, 50);
@@ -431,7 +408,6 @@ class DataPipelineAndTradeLifecycleE2ETest {
     }
 
     @Test
-    @Order(20)
     void engineSharesCalculatedFromCapital() {
         BigDecimal capital = new BigDecimal("50000.00");
         var engine = new BacktestEngine(capital, BigDecimal.ZERO);
@@ -451,7 +427,6 @@ class DataPipelineAndTradeLifecycleE2ETest {
     // ========== Result Metrics from Trade Lifecycle ==========
 
     @Test
-    @Order(21)
     void resultMetricsReflectTradeOutcomes() {
         var engine = new BacktestEngine(new BigDecimal("100000"), BigDecimal.ZERO);
         var strategy = new MACDStrategy(12, 26, 9);
@@ -477,7 +452,6 @@ class DataPipelineAndTradeLifecycleE2ETest {
     }
 
     @Test
-    @Order(22)
     void resultSumOfTradePLMatchesTotalPL() {
         var engine = new BacktestEngine(new BigDecimal("100000"), BigDecimal.ZERO);
         var strategy = new RSIStrategy(14, 30, 70);
@@ -509,7 +483,6 @@ class DataPipelineAndTradeLifecycleE2ETest {
     // ========== Edge Case: Very Small Capital ==========
 
     @Test
-    @Order(23)
     void verySmallCapitalStillWorks() {
         // Capital too small to buy even one share
         BigDecimal tinyCap = new BigDecimal("1.00");
@@ -528,7 +501,6 @@ class DataPipelineAndTradeLifecycleE2ETest {
     // ========== PriceData Record Validation ==========
 
     @Test
-    @Order(24)
     void priceDataRecordEquality() {
         PriceData p1 = new PriceData("2024-01-02",
                 new BigDecimal("100"), new BigDecimal("105"),
@@ -545,18 +517,22 @@ class DataPipelineAndTradeLifecycleE2ETest {
     }
 
     @Test
-    @Order(25)
-    void priceDataNullValidation() {
-        assertThrows(NullPointerException.class,
-                () -> new PriceData(null, BigDecimal.ONE, BigDecimal.ONE,
-                        BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ONE, 0));
-        assertThrows(IllegalArgumentException.class,
-                () -> new PriceData("2024-01-02", BigDecimal.ONE, BigDecimal.ONE,
-                        BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ONE, -1));
+    void priceDataNullDateValidation() {
+        assertThrows(NullPointerException.class, () -> {
+            new PriceData(null, BigDecimal.ONE, BigDecimal.ONE,
+                    BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ONE, 0);
+        });
     }
 
     @Test
-    @Order(26)
+    void priceDataNegativeVolumeValidation() {
+        assertThrows(IllegalArgumentException.class, () -> {
+            new PriceData("2024-01-02", BigDecimal.ONE, BigDecimal.ONE,
+                    BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ONE, -1);
+        });
+    }
+
+    @Test
     void priceDataToStringFormat() {
         PriceData pd = realData.getFirst();
         String str = pd.toString();

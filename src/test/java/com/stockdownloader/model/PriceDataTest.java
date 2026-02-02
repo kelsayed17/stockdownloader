@@ -26,23 +26,26 @@ class PriceDataTest {
 
     @Test
     void nullDateThrows() {
-        assertThrows(NullPointerException.class, () ->
-                new PriceData(null, BigDecimal.ONE, BigDecimal.ONE,
-                        BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ONE, 0));
+        assertThrows(NullPointerException.class, () -> {
+            new PriceData(null, BigDecimal.ONE, BigDecimal.ONE,
+                    BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ONE, 0);
+        });
     }
 
     @Test
     void nullCloseThrows() {
-        assertThrows(NullPointerException.class, () ->
-                new PriceData("2024-01-01", BigDecimal.ONE, BigDecimal.ONE,
-                        BigDecimal.ONE, null, BigDecimal.ONE, 0));
+        assertThrows(NullPointerException.class, () -> {
+            new PriceData("2024-01-01", BigDecimal.ONE, BigDecimal.ONE,
+                    BigDecimal.ONE, null, BigDecimal.ONE, 0);
+        });
     }
 
     @Test
     void negativeVolumeThrows() {
-        assertThrows(IllegalArgumentException.class, () ->
-                new PriceData("2024-01-01", BigDecimal.ONE, BigDecimal.ONE,
-                        BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ONE, -1));
+        assertThrows(IllegalArgumentException.class, () -> {
+            new PriceData("2024-01-01", BigDecimal.ONE, BigDecimal.ONE,
+                    BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ONE, -1);
+        });
     }
 
     @Test

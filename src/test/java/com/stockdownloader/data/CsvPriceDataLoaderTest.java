@@ -15,6 +15,9 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class CsvPriceDataLoaderTest {
 
+    @TempDir
+    Path tempDir;
+
     @Test
     void loadFromStream() {
         String csv = """
@@ -68,7 +71,7 @@ class CsvPriceDataLoaderTest {
     }
 
     @Test
-    void loadFromFile(@TempDir Path tempDir) throws Exception {
+    void loadFromFile() throws Exception {
         Path csvFile = tempDir.resolve("test.csv");
         Files.writeString(csvFile, """
                 Date,Open,High,Low,Close,Adj Close,Volume

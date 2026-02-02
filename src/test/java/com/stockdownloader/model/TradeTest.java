@@ -64,26 +64,30 @@ class TradeTest {
         var trade = new Trade(Trade.Direction.LONG, "2024-01-01", new BigDecimal("100"), 10);
         trade.close("2024-02-01", new BigDecimal("110"));
 
-        assertThrows(IllegalStateException.class, () ->
-                trade.close("2024-03-01", new BigDecimal("120")));
+        assertThrows(IllegalStateException.class, () -> {
+            trade.close("2024-03-01", new BigDecimal("120"));
+        });
     }
 
     @Test
     void zeroSharesThrows() {
-        assertThrows(IllegalArgumentException.class, () ->
-                new Trade(Trade.Direction.LONG, "2024-01-01", new BigDecimal("100"), 0));
+        assertThrows(IllegalArgumentException.class, () -> {
+            new Trade(Trade.Direction.LONG, "2024-01-01", new BigDecimal("100"), 0);
+        });
     }
 
     @Test
     void negativeSharesThrows() {
-        assertThrows(IllegalArgumentException.class, () ->
-                new Trade(Trade.Direction.LONG, "2024-01-01", new BigDecimal("100"), -5));
+        assertThrows(IllegalArgumentException.class, () -> {
+            new Trade(Trade.Direction.LONG, "2024-01-01", new BigDecimal("100"), -5);
+        });
     }
 
     @Test
     void nullDirectionThrows() {
-        assertThrows(NullPointerException.class, () ->
-                new Trade(null, "2024-01-01", new BigDecimal("100"), 10));
+        assertThrows(NullPointerException.class, () -> {
+            new Trade(null, "2024-01-01", new BigDecimal("100"), 10);
+        });
     }
 
     @Test

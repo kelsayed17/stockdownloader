@@ -19,7 +19,9 @@ class BacktestEngineTest {
         var engine = new BacktestEngine(new BigDecimal("10000"), BigDecimal.ZERO);
         List<PriceData> data = List.of(makePriceData("d1", 100));
 
-        assertThrows(NullPointerException.class, () -> engine.run(null, data));
+        assertThrows(NullPointerException.class, () -> {
+            engine.run(null, data);
+        });
     }
 
     @Test
@@ -27,7 +29,9 @@ class BacktestEngineTest {
         var engine = new BacktestEngine(new BigDecimal("10000"), BigDecimal.ZERO);
         var strategy = new SMACrossoverStrategy(2, 5);
 
-        assertThrows(IllegalArgumentException.class, () -> engine.run(strategy, null));
+        assertThrows(IllegalArgumentException.class, () -> {
+            engine.run(strategy, null);
+        });
     }
 
     @Test
@@ -35,7 +39,9 @@ class BacktestEngineTest {
         var engine = new BacktestEngine(new BigDecimal("10000"), BigDecimal.ZERO);
         var strategy = new SMACrossoverStrategy(2, 5);
 
-        assertThrows(IllegalArgumentException.class, () -> engine.run(strategy, List.of()));
+        assertThrows(IllegalArgumentException.class, () -> {
+            engine.run(strategy, List.of());
+        });
     }
 
     @Test

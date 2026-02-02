@@ -20,26 +20,30 @@ class SMACrossoverStrategyTest {
 
     @Test
     void shortPeriodGreaterThanLongThrows() {
-        assertThrows(IllegalArgumentException.class, () ->
-                new SMACrossoverStrategy(20, 10));
+        assertThrows(IllegalArgumentException.class, () -> {
+            new SMACrossoverStrategy(20, 10);
+        });
     }
 
     @Test
     void equalPeriodsThrows() {
-        assertThrows(IllegalArgumentException.class, () ->
-                new SMACrossoverStrategy(10, 10));
+        assertThrows(IllegalArgumentException.class, () -> {
+            new SMACrossoverStrategy(10, 10);
+        });
     }
 
     @Test
     void zeroPeriodThrows() {
-        assertThrows(IllegalArgumentException.class, () ->
-                new SMACrossoverStrategy(0, 10));
+        assertThrows(IllegalArgumentException.class, () -> {
+            new SMACrossoverStrategy(0, 10);
+        });
     }
 
     @Test
     void negativePeriodThrows() {
-        assertThrows(IllegalArgumentException.class, () ->
-                new SMACrossoverStrategy(-5, 10));
+        assertThrows(IllegalArgumentException.class, () -> {
+            new SMACrossoverStrategy(-5, 10);
+        });
     }
 
     @Test

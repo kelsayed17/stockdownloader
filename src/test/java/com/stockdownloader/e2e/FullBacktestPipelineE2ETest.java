@@ -15,9 +15,6 @@ import com.stockdownloader.util.MovingAverageCalculator;
 
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestMethodOrder;
-import org.junit.jupiter.api.MethodOrderer;
-import org.junit.jupiter.api.Order;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
@@ -35,7 +32,6 @@ import static org.junit.jupiter.api.Assertions.*;
  *
  * Uses real historical SPY data from test-price-data.csv (272 trading days).
  */
-@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class FullBacktestPipelineE2ETest {
 
     private static final BigDecimal INITIAL_CAPITAL = new BigDecimal("100000.00");
@@ -79,14 +75,12 @@ class FullBacktestPipelineE2ETest {
     // ========== Data Loading Verification ==========
 
     @Test
-    @Order(1)
     void realSpyDataHasCorrectDateRange() {
         assertEquals("2023-01-03", spyData.getFirst().date());
         assertEquals("2024-01-31", spyData.getLast().date());
     }
 
     @Test
-    @Order(2)
     void realSpyDataOHLCVIntegrity() {
         for (PriceData bar : spyData) {
             assertNotNull(bar.date());
@@ -100,12 +94,12 @@ class FullBacktestPipelineE2ETest {
                     "Close should be <= High on " + bar.date());
             assertTrue(bar.close().compareTo(bar.low()) >= 0,
                     "Close should be >= Low on " + bar.date());
-            assertTrue(bar.volume() > 0, "Volume should be positive on " + bar.date());
+            assertTrue(bar.volume() > 0,
+                    "Volume should be positive on " + bar.date());
         }
     }
 
     @Test
-    @Order(3)
     void realSpyDataChronologicalOrder() {
         for (int i = 1; i < spyData.size(); i++) {
             assertTrue(spyData.get(i).date().compareTo(spyData.get(i - 1).date()) > 0,
@@ -116,7 +110,6 @@ class FullBacktestPipelineE2ETest {
     // ========== Strategy Name Verification ==========
 
     @Test
-    @Order(4)
     void allStrategyNamesMatchExpected() {
         assertEquals("SMA Crossover (50/200)", results.get(0).getStrategyName());
         assertEquals("SMA Crossover (20/50)", results.get(1).getStrategyName());
@@ -128,7 +121,6 @@ class FullBacktestPipelineE2ETest {
     // ========== SMA Crossover (50/200) End-to-End ==========
 
     @Test
-    @Order(5)
     void sma50200ProducesValidEndToEndResults() {
         BacktestResult result = results.get(0);
 
@@ -153,7 +145,6 @@ class FullBacktestPipelineE2ETest {
     // ========== SMA Crossover (20/50) End-to-End ==========
 
     @Test
-    @Order(6)
     void sma2050GeneratesTradesWithRealData() {
         BacktestResult result = results.get(1);
 
@@ -163,7 +154,8 @@ class FullBacktestPipelineE2ETest {
 
         // Verify every trade has valid entry/exit data
         for (Trade trade : result.getClosedTrades()) {
-            assertEquals(Trade.Direction.LONG, trade.getDirection(), "Engine only produces LONG trades");
+            assertEquals(Trade.Direction.LONG, trade.getDirection(),
+                    "Engine only produces LONG trades");
             assertEquals(Trade.Status.CLOSED, trade.getStatus());
             assertNotNull(trade.getEntryDate());
             assertNotNull(trade.getExitDate());
@@ -181,7 +173,6 @@ class FullBacktestPipelineE2ETest {
     // ========== RSI Strategy End-to-End ==========
 
     @Test
-    @Order(7)
     void rsiStrategiesProduceValidSignals() {
         BacktestResult rsi3070 = results.get(2);
         BacktestResult rsi2575 = results.get(3);
@@ -198,7 +189,6 @@ class FullBacktestPipelineE2ETest {
     // ========== MACD Strategy End-to-End ==========
 
     @Test
-    @Order(8)
     void macdStrategyFullPipeline() {
         BacktestResult result = results.get(4);
 
@@ -216,7 +206,6 @@ class FullBacktestPipelineE2ETest {
     // ========== Cross-Strategy Consistency ==========
 
     @Test
-    @Order(9)
     void allStrategiesShareBuyAndHoldBenchmark() {
         BigDecimal firstClose = spyData.getFirst().close();
         BigDecimal lastClose = spyData.getLast().close();
@@ -232,7 +221,6 @@ class FullBacktestPipelineE2ETest {
     }
 
     @Test
-    @Order(10)
     void capitalConservationAcrossStrategies() {
         // With zero commission and the engine's logic, capital should be conserved
         // (initial capital redistributed between cash and positions)
@@ -246,7 +234,6 @@ class FullBacktestPipelineE2ETest {
     }
 
     @Test
-    @Order(11)
     void equityCurveStartsAtInitialCapital() {
         for (BacktestResult result : results) {
             BigDecimal firstEquity = result.getEquityCurve().getFirst();
@@ -257,7 +244,6 @@ class FullBacktestPipelineE2ETest {
     }
 
     @Test
-    @Order(12)
     void equityCurveAllPositiveValues() {
         for (BacktestResult result : results) {
             for (int i = 0; i < result.getEquityCurve().size(); i++) {
@@ -270,7 +256,6 @@ class FullBacktestPipelineE2ETest {
     // ========== Metrics Computation Verification ==========
 
     @Test
-    @Order(13)
     void totalReturnConsistencyAcrossStrategies() {
         for (BacktestResult result : results) {
             // totalReturn = (finalCapital - initialCapital) / initialCapital * 100
@@ -283,7 +268,6 @@ class FullBacktestPipelineE2ETest {
     }
 
     @Test
-    @Order(14)
     void winLossTradeCountsAddUp() {
         for (BacktestResult result : results) {
             assertEquals(result.getTotalTrades(), result.getWinningTrades() + result.getLosingTrades(),
@@ -292,7 +276,6 @@ class FullBacktestPipelineE2ETest {
     }
 
     @Test
-    @Order(15)
     void maxDrawdownBounds() {
         for (BacktestResult result : results) {
             BigDecimal maxDD = result.getMaxDrawdown();
@@ -304,7 +287,6 @@ class FullBacktestPipelineE2ETest {
     }
 
     @Test
-    @Order(16)
     void profitFactorValidValues() {
         for (BacktestResult result : results) {
             BigDecimal pf = result.getProfitFactor();
@@ -316,7 +298,6 @@ class FullBacktestPipelineE2ETest {
     // ========== Report Generation E2E ==========
 
     @Test
-    @Order(17)
     void individualReportsGenerateWithoutErrors() {
         PrintStream original = System.out;
         var capture = new ByteArrayOutputStream();
@@ -349,7 +330,6 @@ class FullBacktestPipelineE2ETest {
     }
 
     @Test
-    @Order(18)
     void comparisonReportGeneratesWithoutErrors() {
         PrintStream original = System.out;
         var capture = new ByteArrayOutputStream();
@@ -375,7 +355,6 @@ class FullBacktestPipelineE2ETest {
     }
 
     @Test
-    @Order(19)
     void bestStrategyIdentifiedCorrectly() {
         PrintStream original = System.out;
         var capture = new ByteArrayOutputStream();
@@ -403,7 +382,6 @@ class FullBacktestPipelineE2ETest {
     // ========== Commission Impact E2E ==========
 
     @Test
-    @Order(20)
     void commissionImpactOnAllStrategies() {
         BigDecimal commission = new BigDecimal("9.99");
         var engineWithComm = new BacktestEngine(INITIAL_CAPITAL, commission);
@@ -422,7 +400,6 @@ class FullBacktestPipelineE2ETest {
     // ========== Determinism E2E ==========
 
     @Test
-    @Order(21)
     void fullPipelineIsDeterministic() {
         var engine = new BacktestEngine(INITIAL_CAPITAL, ZERO_COMMISSION);
         List<BacktestResult> rerun = new ArrayList<>();
@@ -449,7 +426,6 @@ class FullBacktestPipelineE2ETest {
     // ========== Moving Average Integration ==========
 
     @Test
-    @Order(22)
     void movingAveragesCorrectlyComputedOnRealData() {
         // Verify SMA/EMA computations on real SPY data match expected behavior
         int idx = 100; // Well past any warmup period
@@ -475,7 +451,6 @@ class FullBacktestPipelineE2ETest {
     // ========== BigDecimalMath Integration ==========
 
     @Test
-    @Order(23)
     void bigDecimalMathUsedInMetricComputations() {
         // Verify BigDecimalMath.percentChange gives same result as BacktestResult.getBuyAndHoldReturn
         BigDecimal firstClose = spyData.getFirst().close();
@@ -491,7 +466,6 @@ class FullBacktestPipelineE2ETest {
     // ========== Varying Capital Sizes ==========
 
     @Test
-    @Order(24)
     void differentCapitalSizesProduceProportionalResults() {
         var strategy = new SMACrossoverStrategy(20, 50);
         BigDecimal smallCap = new BigDecimal("10000.00");

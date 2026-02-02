@@ -20,26 +20,30 @@ class MACDStrategyTest {
 
     @Test
     void fastGreaterThanSlowThrows() {
-        assertThrows(IllegalArgumentException.class, () ->
-                new MACDStrategy(26, 12, 9));
+        assertThrows(IllegalArgumentException.class, () -> {
+            new MACDStrategy(26, 12, 9);
+        });
     }
 
     @Test
     void equalFastAndSlowThrows() {
-        assertThrows(IllegalArgumentException.class, () ->
-                new MACDStrategy(12, 12, 9));
+        assertThrows(IllegalArgumentException.class, () -> {
+            new MACDStrategy(12, 12, 9);
+        });
     }
 
     @Test
     void zeroPeriodThrows() {
-        assertThrows(IllegalArgumentException.class, () ->
-                new MACDStrategy(0, 26, 9));
+        assertThrows(IllegalArgumentException.class, () -> {
+            new MACDStrategy(0, 26, 9);
+        });
     }
 
     @Test
     void negativePeriodThrows() {
-        assertThrows(IllegalArgumentException.class, () ->
-                new MACDStrategy(-1, 26, 9));
+        assertThrows(IllegalArgumentException.class, () -> {
+            new MACDStrategy(-1, 26, 9);
+        });
     }
 
     @Test

@@ -20,32 +20,37 @@ class RSIStrategyTest {
 
     @Test
     void zeroPeriodThrows() {
-        assertThrows(IllegalArgumentException.class, () ->
-                new RSIStrategy(0, 30, 70));
+        assertThrows(IllegalArgumentException.class, () -> {
+            new RSIStrategy(0, 30, 70);
+        });
     }
 
     @Test
     void oversoldGreaterThanOverboughtThrows() {
-        assertThrows(IllegalArgumentException.class, () ->
-                new RSIStrategy(14, 80, 70));
+        assertThrows(IllegalArgumentException.class, () -> {
+            new RSIStrategy(14, 80, 70);
+        });
     }
 
     @Test
     void equalThresholdsThrows() {
-        assertThrows(IllegalArgumentException.class, () ->
-                new RSIStrategy(14, 50, 50));
+        assertThrows(IllegalArgumentException.class, () -> {
+            new RSIStrategy(14, 50, 50);
+        });
     }
 
     @Test
     void negativeOversoldThrows() {
-        assertThrows(IllegalArgumentException.class, () ->
-                new RSIStrategy(14, -10, 70));
+        assertThrows(IllegalArgumentException.class, () -> {
+            new RSIStrategy(14, -10, 70);
+        });
     }
 
     @Test
     void overboughtAbove100Throws() {
-        assertThrows(IllegalArgumentException.class, () ->
-                new RSIStrategy(14, 30, 101));
+        assertThrows(IllegalArgumentException.class, () -> {
+            new RSIStrategy(14, 30, 101);
+        });
     }
 
     @Test

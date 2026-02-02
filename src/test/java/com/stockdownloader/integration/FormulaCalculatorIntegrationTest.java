@@ -63,7 +63,7 @@ class FormulaCalculatorIntegrationTest {
         assertNotNull(peRatioTTM);
         assertTrue(peRatioTTM.compareTo(BigDecimal.ZERO) > 0,
                 "P/E ratio TTM should be positive");
-        // 150/6.5 ≈ 23.08
+        // 150/6.5 ~ 23.08
         assertTrue(peRatioTTM.compareTo(new BigDecimal("22")) > 0);
         assertTrue(peRatioTTM.compareTo(new BigDecimal("24")) < 0);
 
@@ -71,7 +71,7 @@ class FormulaCalculatorIntegrationTest {
         assertNotNull(forwardPE);
         assertTrue(forwardPE.compareTo(BigDecimal.ZERO) > 0,
                 "Forward P/E should be positive");
-        // 150/7.2 ≈ 20.83
+        // 150/7.2 ~ 20.83
         assertTrue(forwardPE.compareTo(new BigDecimal("20")) > 0);
         assertTrue(forwardPE.compareTo(new BigDecimal("22")) < 0);
 

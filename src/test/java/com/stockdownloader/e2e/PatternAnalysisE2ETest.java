@@ -11,9 +11,6 @@ import com.google.common.collect.HashMultimap;
 
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestMethodOrder;
-import org.junit.jupiter.api.MethodOrderer;
-import org.junit.jupiter.api.Order;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
@@ -39,7 +36,6 @@ import static org.junit.jupiter.api.Assertions.*;
  * This exercises: PriceData, HistoricalData, PatternResult, PatternAnalyzer,
  * BigDecimalMath, and the Guava HashMultimap pattern storage.
  */
-@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class PatternAnalysisE2ETest {
 
     private static final int PATTERN_DAYS = 7;
@@ -109,7 +105,6 @@ class PatternAnalysisE2ETest {
     // ========== Pattern Generation ==========
 
     @Test
-    @Order(1)
     void patternsGeneratedFromRealData() {
         assertTrue(allPatterns.keySet().size() > 0,
                 "Should have multiple distinct pattern keys");
@@ -118,7 +113,6 @@ class PatternAnalysisE2ETest {
     }
 
     @Test
-    @Order(2)
     void patternKeysHaveExpectedFormat() {
         for (String key : allPatterns.keySet()) {
             assertTrue(key.startsWith("["), "Pattern key should start with [");
@@ -134,7 +128,6 @@ class PatternAnalysisE2ETest {
     }
 
     @Test
-    @Order(3)
     void patternsAssociatedWithCorrectTickers() {
         // Verify that synthetic tickers are associated with patterns
         boolean foundSynthetic = false;
@@ -154,14 +147,12 @@ class PatternAnalysisE2ETest {
     // ========== PatternAnalyzer Results ==========
 
     @Test
-    @Order(4)
     void analyzerProducesResults() {
         assertNotNull(analysisResults);
         assertFalse(analysisResults.isEmpty(), "Analysis should produce results");
     }
 
     @Test
-    @Order(5)
     void resultsAreSortedByFrequencyDescending() {
         BigDecimal prevFreq = null;
         for (PatternResult result : analysisResults) {
@@ -174,7 +165,6 @@ class PatternAnalysisE2ETest {
     }
 
     @Test
-    @Order(6)
     void patternResultFieldsPopulated() {
         for (PatternResult result : analysisResults) {
             assertNotNull(result.getPattern(), "Pattern should not be null");
@@ -189,7 +179,6 @@ class PatternAnalysisE2ETest {
     }
 
     @Test
-    @Order(7)
     void similarPatternIsInverse() {
         for (PatternResult result : analysisResults) {
             String pattern = result.getPattern();
@@ -221,7 +210,6 @@ class PatternAnalysisE2ETest {
     }
 
     @Test
-    @Order(8)
     void offsetPatternRemovesFirstElement() {
         for (PatternResult result : analysisResults) {
             String pattern = result.getPattern();
@@ -250,7 +238,6 @@ class PatternAnalysisE2ETest {
     }
 
     @Test
-    @Order(9)
     void accuracyPercentageBounds() {
         for (PatternResult result : analysisResults) {
             BigDecimal accuracy = result.getAccuracy();
@@ -262,7 +249,6 @@ class PatternAnalysisE2ETest {
     }
 
     @Test
-    @Order(10)
     void accuracyFormulaVerification() {
         for (PatternResult result : analysisResults) {
             BigDecimal pf = result.getPatternFreq();
@@ -281,7 +267,6 @@ class PatternAnalysisE2ETest {
     }
 
     @Test
-    @Order(11)
     void patternSymbolsAreNonEmpty() {
         for (PatternResult result : analysisResults) {
             assertFalse(result.getPatternSymbols().isEmpty(),
@@ -296,7 +281,6 @@ class PatternAnalysisE2ETest {
     // ========== Report Generation ==========
 
     @Test
-    @Order(12)
     void printResultsGeneratesOutput() {
         PrintStream original = System.out;
         var capture = new ByteArrayOutputStream();
@@ -321,7 +305,6 @@ class PatternAnalysisE2ETest {
     // ========== HistoricalData Integration ==========
 
     @Test
-    @Order(13)
     void historicalDataPatternStorage() {
         HistoricalData hd = new HistoricalData("TEST");
         hd.setHighestPriceThisQtr(new BigDecimal("200.00"));
@@ -338,7 +321,6 @@ class PatternAnalysisE2ETest {
     }
 
     @Test
-    @Order(14)
     void multipleTickersGenerateDistinctPatterns() {
         HistoricalData hd1 = generatePatterns("TICK1", 0);
         HistoricalData hd2 = generatePatterns("TICK2", 50);
@@ -362,7 +344,6 @@ class PatternAnalysisE2ETest {
     // ========== PatternResult Record Behavior ==========
 
     @Test
-    @Order(15)
     void patternResultComparableOrdering() {
         // PatternResult's compareTo sorts by frequency descending
         var result1 = new PatternResult("[1, 0]", "[-1, 0]", "[0]",
@@ -379,7 +360,6 @@ class PatternAnalysisE2ETest {
     // ========== Full Pipeline with All Pattern Lengths ==========
 
     @Test
-    @Order(16)
     void patternsGrowIncrementallyPerBar() {
         // The YahooHistoricalClient adds to the upDownList incrementally:
         // After 1 bar: [1]
