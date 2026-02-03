@@ -1,42 +1,57 @@
 # Stock Downloader
 
-A Java-based stock market analysis and backtesting platform. It fetches historical price data from Yahoo Finance and runs configurable trading strategies against it, producing detailed performance reports for both equity and options strategies.
+A Python-based stock market analysis and backtesting platform. It fetches historical price data from Yahoo Finance and runs configurable trading strategies against it, producing detailed performance reports for both equity and options strategies.
 
 ## Features
 
 - **Historical data download** from Yahoo Finance with automatic authentication
-- **Equity backtesting** with SMA Crossover, RSI, and MACD strategies
+- **Equity backtesting** with SMA Crossover, RSI, MACD, Bollinger Band RSI, Momentum Confluence, Breakout, and Multi-Indicator strategies
 - **Options backtesting** with Covered Call and Protective Put strategies using Black-Scholes pricing
 - **Trend analysis** across stock universes (NASDAQ, Zacks lists, earnings calendars)
+- **Signal generation** with confluence scoring across trend, momentum, volume, and volatility indicators
 - **Strategy comparison** with side-by-side performance metrics and buy-and-hold benchmarks
+- **20+ technical indicators**: RSI, MACD, Bollinger Bands, Ichimoku Cloud, Stochastic, Williams %R, CCI, ROC, ADX, Parabolic SAR, VWAP, OBV, MFI, Fibonacci retracement, support/resistance
 
 ## Requirements
 
-- Java 21+
-- Maven 3.x or Gradle 8.x
+- Python 3.12+
+- pip
 
-## Build
+## Installation
 
 ```bash
-# Maven
-mvn clean compile
+# Install dependencies
+pip install -r requirements.txt
 
-# Gradle
-gradle clean build
+# Or install as a package
+pip install -e .
+
+# Install development dependencies
+pip install -e ".[dev]"
 ```
 
 ## Usage
 
-### SPY Equity Backtest
+### Symbol Analysis (Full Suite)
 
-Runs five equity trading strategies against SPY historical data:
+Runs all equity and options strategies, generates trading alerts with confluence scoring:
 
 ```bash
-# From a CSV file
-java -cp "target/classes:lib/*" com.stockdownloader.app.SPYBacktestApp spy_data.csv
+python -m stockdownloader.app.symbol_analysis_app AAPL
+python -m stockdownloader.app.symbol_analysis_app SPY 2y
+```
 
-# Or download directly from Yahoo Finance (no argument needed)
-java -cp "target/classes:lib/*" com.stockdownloader.app.SPYBacktestApp
+### SPY Equity Backtest
+
+Runs nine equity trading strategies against historical data:
+
+```bash
+# Fetch from Yahoo Finance
+python -m stockdownloader.app.spy_backtest_app
+python -m stockdownloader.app.spy_backtest_app AAPL
+
+# From a CSV file
+python -m stockdownloader.app.spy_backtest_app --csv spy_data.csv
 ```
 
 CSV format: `Date,Open,High,Low,Close,Adj Close,Volume`
@@ -46,7 +61,8 @@ CSV format: `Date,Open,High,Low,Close,Adj Close,Volume`
 Runs six options strategies (covered calls and protective puts) against historical data:
 
 ```bash
-java -cp "target/classes:lib/*" com.stockdownloader.app.OptionsBacktestApp spy_data.csv
+python -m stockdownloader.app.options_backtest_app
+python -m stockdownloader.app.options_backtest_app --csv spy_data.csv
 ```
 
 ### Trend Analysis
@@ -54,7 +70,7 @@ java -cp "target/classes:lib/*" com.stockdownloader.app.OptionsBacktestApp spy_d
 Scans stock universes for price patterns:
 
 ```bash
-java -cp "target/classes:lib/*" com.stockdownloader.app.TrendAnalysisApp
+python -m stockdownloader.app.trend_analysis_app
 ```
 
 ## Backtesting Strategies
@@ -92,7 +108,7 @@ Standard mean-reversion strategy using Relative Strength Index.
 
 #### RSI (14, 25/75)
 
-Aggressive RSI variant with tighter thresholds, requiring stronger oversold/overbought signals before triggering.
+Aggressive RSI variant with tighter thresholds.
 
 - **BUY**: RSI crosses above 25
 - **SELL**: RSI crosses below 75
@@ -105,9 +121,27 @@ Momentum strategy using Moving Average Convergence Divergence.
 
 - **BUY**: MACD line crosses above signal line
 - **SELL**: MACD line crosses below signal line
-- **Calculation**: MACD = 12-period EMA - 26-period EMA; Signal = 9-period EMA of MACD
 - **Best for**: Trending markets with clear momentum shifts
 - **Warmup**: 35 bars
+
+#### Bollinger Band + RSI
+
+Combined Bollinger Band and RSI strategy.
+
+- **BUY**: Price touches lower band AND RSI < 30
+- **SELL**: Price touches upper band AND RSI > 70
+
+#### Momentum Confluence
+
+Multi-signal momentum confirmation strategy using MACD, RSI, and Stochastic.
+
+#### Breakout
+
+Channel breakout strategy based on high/low price channels.
+
+#### Multi-Indicator
+
+Scores multiple indicators and requires confluence for signals.
 
 ### Options Strategies
 
@@ -115,16 +149,13 @@ All options strategies start with $100,000 initial capital and $0.65/contract co
 
 #### Covered Call
 
-Sells out-of-the-money calls against a long stock position to generate income. Caps upside in exchange for premium collected.
+Sells out-of-the-money calls against a long stock position to generate income.
 
 | Variant | MA Period | OTM % | DTE | Exit Threshold |
 |---------|-----------|-------|-----|----------------|
 | Aggressive income | 20 | 3% | 30 | 3% |
 | Standard | 20 | 5% | 30 | 3% |
 | Conservative | 50 | 5% | 45 | 4% |
-
-- **OPEN**: Price crosses above the moving average (mild bullish bias)
-- **CLOSE**: Price drops more than the exit threshold below the MA
 
 #### Protective Put
 
@@ -136,183 +167,92 @@ Buys out-of-the-money puts to hedge a long stock position against downside risk.
 | Aggressive protection | 20 | 3% | 45 | 10 bars |
 | Conservative long-term | 50 | 5% | 60 | 10 bars |
 
-- **OPEN**: Price crosses below the MA, or momentum drops below -2% over the lookback window
-- **CLOSE**: Price recovers more than 2% above the MA
-
-## Sample Output
-
-### Equity Backtest Report
-
-```
-======================================================================
-  BACKTEST REPORT: SMA Crossover (50/200)
-======================================================================
-
-  Period:              2021-01-04 to 2025-12-31
-  Initial Capital:     $100000.00
-  Final Capital:       $112480.35
-
-----------------------------------------------------------------------
-  PERFORMANCE METRICS
-----------------------------------------------------------------------
-  Total Return:        12.48%
-  Buy & Hold Return:   58.27%
-  Total P/L:           $12480.35
-  Sharpe Ratio:        0.42
-  Max Drawdown:        8.75%
-  Profit Factor:       1.86
-
-----------------------------------------------------------------------
-  TRADE STATISTICS
-----------------------------------------------------------------------
-  Total Trades:        6
-  Winning Trades:      4
-  Losing Trades:       2
-  Win Rate:            66.67%
-  Average Win:         $4820.12
-  Average Loss:        $3400.06
-```
-
-### Equity Strategy Comparison
-
-```
-==========================================================================================
-  STRATEGY COMPARISON SUMMARY
-==========================================================================================
-
-  Strategy                              Return     Sharpe      MaxDD     Trades   Win Rate
-------------------------------------------------------------------------------------------
-  Buy & Hold (Benchmark)               58.27%        N/A        N/A          1        N/A
-  SMA Crossover (50/200)               12.48%       0.42      8.75%          6     66.67%
-  SMA Crossover (20/50)                18.92%       0.55     10.20%         14     57.14%
-  RSI (14, 30/70)                       9.35%       0.31      7.40%         11     54.55%
-  RSI (14, 25/75)                       6.20%       0.22      6.15%          7     57.14%
-  MACD (12/26/9)                       15.60%       0.48     11.30%         18     50.00%
-------------------------------------------------------------------------------------------
-
-  Best performing strategy: SMA Crossover (20/50)
-  Return: 18.92% | Sharpe: 0.55 | Max Drawdown: 10.20%
-  >> Underperformed Buy & Hold by 39.35 percentage points
-
-  DISCLAIMER: This is for educational purposes only.
-  Past performance does not guarantee future results.
-  Always do your own research before trading.
-```
-
-### Options Backtest Report
-
-```
-================================================================================
-  OPTIONS BACKTEST REPORT: Covered Call (MA20, 5% OTM, 30DTE)
-================================================================================
-
-  Period:              2021-01-04 to 2025-12-31
-  Initial Capital:     $100000.00
-  Final Capital:       $104250.80
-
---------------------------------------------------------------------------------
-  PERFORMANCE METRICS
---------------------------------------------------------------------------------
-  Total Return:        4.25%
-  Total P/L:           $4250.80
-  Sharpe Ratio:        0.35
-  Max Drawdown:        5.10%
-  Profit Factor:       1.52
-
---------------------------------------------------------------------------------
-  TRADE STATISTICS
---------------------------------------------------------------------------------
-  Total Trades:        22
-  Winning Trades:      15
-  Losing Trades:       7
-  Win Rate:            68.18%
-  Average Win:         $520.40
-  Average Loss:        $380.15
-
---------------------------------------------------------------------------------
-  OPTIONS-SPECIFIC METRICS
---------------------------------------------------------------------------------
-  Avg Premium/Trade:   $485.30
-  Total Volume:        22 contracts
-```
-
-### Options Strategy Comparison
-
-```
-====================================================================================================
-  OPTIONS STRATEGY COMPARISON
-====================================================================================================
-
-  Strategy                                   Return     Sharpe      MaxDD     Trades    WinRate    Volume
-----------------------------------------------------------------------------------------------------
-  Covered Call (MA20, 3% OTM, 30DTE)          5.80%       0.40      4.90%         25     72.00%        25
-  Covered Call (MA20, 5% OTM, 30DTE)          4.25%       0.35      5.10%         22     68.18%        22
-  Covered Call (MA50, 5% OTM, 45DTE)          3.10%       0.28      4.20%         12     66.67%        12
-  Protective Put (MA20, 5% OTM, 30DTE)       -2.40%      -0.18      3.80%         18     44.44%        18
-  Protective Put (MA20, 3% OTM, 45DTE)       -3.60%      -0.25      4.50%         15     40.00%        15
-  Protective Put (MA50, 5% OTM, 60DTE)       -1.80%      -0.12      3.20%          8     37.50%         8
-----------------------------------------------------------------------------------------------------
-
-  Best performing strategy: Covered Call (MA20, 3% OTM, 30DTE)
-  Return: 5.80% | Sharpe: 0.40 | Max Drawdown: 4.90%
-
-  DISCLAIMER: This is for educational purposes only.
-  Options trading involves significant risk. Past performance
-  does not guarantee future results.
-```
-
-> **Note**: The numbers above are illustrative examples showing the report format. Actual results depend on the date range and market conditions of the input data.
-
 ## Project Structure
 
 ```
-src/main/java/com/stockdownloader/
-  app/                          # Entry points
-    SPYBacktestApp.java           # Equity backtest runner
-    OptionsBacktestApp.java       # Options backtest runner
-    TrendAnalysisApp.java         # Stock universe pattern scanner
-  strategy/                     # Trading strategies
-    TradingStrategy.java          # Equity strategy interface
-    OptionsStrategy.java          # Options strategy interface
-    SMACrossoverStrategy.java     # SMA golden/death cross
-    RSIStrategy.java              # RSI overbought/oversold
-    MACDStrategy.java             # MACD signal line crossover
-    CoveredCallStrategy.java      # Sell OTM calls for income
-    ProtectivePutStrategy.java    # Buy OTM puts for hedging
-  backtest/                     # Backtesting engines
-    BacktestEngine.java           # Equity simulation engine
-    OptionsBacktestEngine.java    # Options simulation engine
-    BacktestResult.java           # Equity result metrics
-    OptionsBacktestResult.java    # Options result metrics
-    BacktestReportFormatter.java  # Equity report output
-    OptionsBacktestReportFormatter.java
-  model/                        # Data models
-    PriceData.java                # OHLCV price record
-    Trade.java                    # Equity trade tracking
-    OptionsTrade.java             # Options trade tracking
-    OptionContract.java           # Option with greeks
-    OptionsChain.java             # Full chain by expiration
-    UnifiedMarketData.java        # Consolidated symbol data
-  data/                         # Data fetching
-    YahooQuoteClient.java         # Yahoo Finance API client
-    YahooAuthHelper.java          # Yahoo authentication
-    CsvPriceDataLoader.java       # CSV parser
-  util/                         # Utilities
-    MovingAverageCalculator.java  # SMA and EMA calculation
-    BlackScholesCalculator.java   # Option pricing and greeks
+stockdownloader/
+  app/                              # Entry points
+    spy_backtest_app.py               # Equity backtest runner
+    options_backtest_app.py           # Options backtest runner
+    trend_analysis_app.py             # Stock universe pattern scanner
+    symbol_analysis_app.py            # Full symbol analysis with alerts
+  strategy/                         # Trading strategies
+    trading_strategy.py               # Equity strategy ABC
+    options_strategy.py               # Options strategy ABC
+    sma_crossover_strategy.py         # SMA golden/death cross
+    rsi_strategy.py                   # RSI overbought/oversold
+    macd_strategy.py                  # MACD signal line crossover
+    bollinger_band_rsi_strategy.py    # Bollinger Band + RSI
+    momentum_confluence_strategy.py   # Multi-momentum confluence
+    breakout_strategy.py              # Channel breakout
+    multi_indicator_strategy.py       # Multi-indicator scoring
+    covered_call_strategy.py          # Sell OTM calls for income
+    protective_put_strategy.py        # Buy OTM puts for hedging
+  backtest/                         # Backtesting engines
+    backtest_engine.py                # Equity simulation engine
+    options_backtest_engine.py        # Options simulation engine
+    backtest_result.py                # Equity result metrics
+    options_backtest_result.py        # Options result metrics
+    backtest_report_formatter.py      # Equity report output
+    options_backtest_report_formatter.py
+  model/                            # Data models
+    price_data.py                     # OHLCV price dataclass
+    trade.py                          # Equity trade tracking
+    options_trade.py                  # Options trade tracking
+    option_contract.py                # Option with greeks
+    options_chain.py                  # Full chain by expiration
+    unified_market_data.py            # Consolidated symbol data
+    indicator_values.py               # Technical indicator snapshot
+    alert_result.py                   # Trading alert with recommendations
+  data/                             # Data fetching
+    yahoo_data_client.py              # Yahoo Finance API client
+    yahoo_auth_helper.py              # Yahoo authentication
+    csv_price_data_loader.py          # CSV parser
+    stock_list_downloader.py          # Stock list downloads
+    morningstar_client.py             # Morningstar financial data
+  util/                             # Utilities
+    moving_average_calculator.py      # SMA and EMA calculation
+    black_scholes_calculator.py       # Option pricing and greeks
+    technical_indicators.py           # 20+ technical indicators
+    big_decimal_math.py               # Decimal arithmetic helpers
+    date_helper.py                    # Market date calculations
+    file_helper.py                    # File I/O utilities
+    retry_executor.py                 # Retry logic
+  analysis/                         # Analysis tools
+    signal_generator.py               # Trading alerts with confluence
+    formula_calculator.py             # Stock valuation formulas
+    pattern_analyzer.py               # Price pattern analysis
+tests/                              # Test suite (pytest)
+  model/                              # Model unit tests
+  util/                               # Utility unit tests
+  strategy/                           # Strategy unit tests
+  backtest/                           # Backtest unit tests
+  data/                               # Data layer tests
+  analysis/                           # Analysis unit tests
+  integration/                        # Integration tests
+  e2e/                                # End-to-end tests
 ```
 
 ## Tests
 
 ```bash
-# Maven
-mvn test
+# Run all tests
+pytest
 
-# Gradle
-gradle test
+# Run with coverage
+pytest --cov=stockdownloader
+
+# Run specific test module
+pytest tests/model/
+pytest tests/strategy/
+pytest tests/backtest/
+
+# Run integration tests
+pytest tests/integration/
+
+# Run end-to-end tests
+pytest tests/e2e/
 ```
-
-Integration tests cover the full pipeline: CSV loading, strategy signal generation, backtest execution, options pricing, and report formatting.
 
 ## Disclaimer
 

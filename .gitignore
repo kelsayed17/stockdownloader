@@ -1,9 +1,19 @@
-# Build output
-build/
-target/
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
 
-# Gradle
-.gradle/
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+env/
 
 # IDE
 .idea/
@@ -13,6 +23,16 @@ target/
 .project
 .classpath
 
+# Testing / coverage
+.pytest_cache/
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+
 # OS
 .DS_Store
 Thumbs.db
+
+# Misc
+*.log

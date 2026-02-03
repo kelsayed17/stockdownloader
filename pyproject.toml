@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=75.0", "wheel"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "stockdownloader"
+version = "1.0.0"
+description = "Stock analysis, backtesting, and options trading platform"
+readme = "README.md"
+requires-python = ">=3.12"
+license = {text = "MIT"}
+
+dependencies = [
+    "requests>=2.32.0",
+    "beautifulsoup4>=4.12.0",
+    "scipy>=1.14.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3.0",
+    "pytest-cov>=6.0.0",
+]
+
+[project.scripts]
+spy-backtest = "stockdownloader.app.spy_backtest_app:main"
+options-backtest = "stockdownloader.app.options_backtest_app:main"
+trend-analysis = "stockdownloader.app.trend_analysis_app:main"
+symbol-analysis = "stockdownloader.app.symbol_analysis_app:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+
+[tool.setuptools.packages.find]
+include = ["stockdownloader*"]
