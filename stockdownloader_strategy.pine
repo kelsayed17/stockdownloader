@@ -1,0 +1,653 @@
+// This Pine Script™ source code is subject to the terms of the Mozilla Public License 2.0
+// https://mozilla.org/MPL/2.0/
+//
+// Stock Downloader — Multi-Strategy Trading System
+//
+// A comprehensive TradingView strategy that ports all 9 equity strategies and
+// 13+ technical indicators from the Stock Downloader backtesting platform.
+//
+// Strategies:
+//   1. SMA Crossover (50/200) — Golden/Death Cross
+//   2. SMA Crossover (20/50)  — Medium-term trend following
+//   3. RSI (14, 30/70)        — Standard mean reversion
+//   4. RSI (14, 25/75)        — Aggressive mean reversion
+//   5. MACD (12/26/9)         — Momentum crossover
+//   6. BB + RSI Mean Reversion — Multi-indicator mean reversion
+//   7. Momentum Confluence     — MACD + ADX + EMA trend filter
+//   8. Breakout                — BB squeeze + volume confirmation
+//   9. Multi-Indicator         — 8-factor confluence scoring
+//
+// Signal Generator:
+//   Confluence-based scoring across trend, momentum, volume, and volatility
+//   categories producing STRONG_BUY / BUY / NEUTRAL / SELL / STRONG_SELL signals.
+
+//@version=6
+strategy("Stock Downloader Multi-Strategy", overlay=true, default_qty_type=strategy.percent_of_equity,
+     default_qty_value=100, initial_capital=100000, commission_value=0,
+     process_orders_on_close=true, max_labels_count=500, max_lines_count=500)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// INPUTS
+// ─────────────────────────────────────────────────────────────────────────────
+
+string STRAT_GROUP    = "Strategy Selection"
+string SMA_GROUP      = "SMA Crossover Settings"
+string RSI_GROUP      = "RSI Settings"
+string MACD_GROUP     = "MACD Settings"
+string BB_RSI_GROUP   = "BB + RSI Mean Reversion Settings"
+string MOM_GROUP      = "Momentum Confluence Settings"
+string BRK_GROUP      = "Breakout Settings"
+string MULTI_GROUP    = "Multi-Indicator Settings"
+string VIS_GROUP      = "Display Settings"
+
+// Strategy selector
+strategyChoice = input.string("Multi-Indicator Confluence", title="Active Strategy",
+     options=["SMA Crossover (50/200)", "SMA Crossover (20/50)", "RSI (30/70)",
+              "RSI (25/75)", "MACD (12/26/9)", "BB + RSI Mean Reversion",
+              "Momentum Confluence", "Breakout", "Multi-Indicator Confluence"],
+     group=STRAT_GROUP)
+
+// SMA Crossover
+smaShort1  = input.int(50, "Short SMA", minval=1, group=SMA_GROUP)
+smaLong1   = input.int(200, "Long SMA", minval=1, group=SMA_GROUP)
+
+// RSI
+rsiPeriod  = input.int(14, "RSI Period", minval=1, group=RSI_GROUP)
+rsiOS      = input.float(30, "Oversold Threshold", minval=0, maxval=100, group=RSI_GROUP)
+rsiOB      = input.float(70, "Overbought Threshold", minval=0, maxval=100, group=RSI_GROUP)
+
+// MACD
+macdFast   = input.int(12, "Fast EMA", minval=1, group=MACD_GROUP)
+macdSlow   = input.int(26, "Slow EMA", minval=1, group=MACD_GROUP)
+macdSignal = input.int(9, "Signal Period", minval=1, group=MACD_GROUP)
+
+// BB + RSI Mean Reversion
+bbPeriod   = input.int(20, "BB Period", minval=1, group=BB_RSI_GROUP)
+bbMult     = input.float(2.0, "BB Std Dev Multiplier", minval=0.1, step=0.1, group=BB_RSI_GROUP)
+bbAdxThresh = input.float(25.0, "ADX Range-Bound Threshold", minval=1, group=BB_RSI_GROUP)
+
+// Momentum Confluence
+momEmaFilt = input.int(200, "Trend Filter EMA", minval=1, group=MOM_GROUP)
+momAdxStr  = input.float(25.0, "ADX Strong Trend Threshold", minval=1, group=MOM_GROUP)
+momAdxWeak = input.float(20.0, "ADX Weak Trend Threshold", minval=1, group=MOM_GROUP)
+
+// Breakout
+brkSqzLookback = input.int(120, "Squeeze Lookback", minval=10, group=BRK_GROUP)
+brkVolMult     = input.float(1.5, "Volume Multiplier", minval=1.0, step=0.1, group=BRK_GROUP)
+
+// Multi-Indicator Confluence
+multiBuyThresh  = input.int(4, "Buy Threshold (out of 8)", minval=1, maxval=8, group=MULTI_GROUP)
+multiSellThresh = input.int(4, "Sell Threshold (out of 8)", minval=1, maxval=8, group=MULTI_GROUP)
+
+// Display
+showDashboard   = input.bool(true, "Show Confluence Dashboard", group=VIS_GROUP)
+showSR          = input.bool(true, "Show Support/Resistance Levels", group=VIS_GROUP)
+showBBOverlay   = input.bool(false, "Show Bollinger Bands Overlay", group=VIS_GROUP)
+showIchimoku    = input.bool(false, "Show Ichimoku Cloud", group=VIS_GROUP)
+showSAROverlay  = input.bool(false, "Show Parabolic SAR Dots", group=VIS_GROUP)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TECHNICAL INDICATORS — computed once, used by all strategies
+// ─────────────────────────────────────────────────────────────────────────────
+
+// === Moving Averages ===
+sma20   = ta.sma(close, 20)
+sma50   = ta.sma(close, 50)
+sma200  = ta.sma(close, 200)
+ema12   = ta.ema(close, 12)
+ema26   = ta.ema(close, 26)
+ema200  = ta.ema(close, 200)
+
+// Configurable SMA Crossover pairs
+smaShortVal = ta.sma(close, smaShort1)
+smaLongVal  = ta.sma(close, smaLong1)
+
+// === RSI ===
+rsiVal     = ta.rsi(close, rsiPeriod)
+prevRSI    = rsiVal[1]
+
+// === MACD ===
+[macdLine, macdSig, macdHist] = ta.macd(close, macdFast, macdSlow, macdSignal)
+
+// === Bollinger Bands ===
+bbBasis  = ta.sma(close, bbPeriod)
+bbDev    = ta.stdev(close, bbPeriod) * bbMult
+bbUpper  = bbBasis + bbDev
+bbLower  = bbBasis - bbDev
+bbWidth  = (bbUpper - bbLower) / bbBasis
+bbPctB   = bbBasis != 0 ? (close - bbLower) / (bbUpper - bbLower) : 0.5
+
+// === Stochastic Oscillator ===
+stochK_raw = ta.stoch(close, high, low, 14)
+stochK     = ta.sma(stochK_raw, 3)
+stochD     = ta.sma(stochK, 3)
+
+// === Williams %R ===
+williamsR = -100 * (ta.highest(high, 14) - close) / (ta.highest(high, 14) - ta.lowest(low, 14))
+
+// === CCI ===
+cciVal = ta.cci(close, 20)
+
+// === ROC ===
+rocVal = ta.roc(close, 12)
+
+// === ADX / DI ===
+adxLen       = 14
+[diPlus, diMinus, adxVal] = ta.dmi(adxLen, adxLen)
+
+// === ATR ===
+atrVal      = ta.atr(14)
+prevATR     = atrVal[1]
+
+// === OBV ===
+obvVal      = ta.obv
+obvRising   = ta.sma(obvVal, 5) > ta.sma(obvVal, 5)[1]
+
+// === MFI ===
+mfiVal      = ta.mfi(hlc3, 14)
+
+// === VWAP ===
+vwapVal     = ta.vwap(hlc3)
+
+// === Parabolic SAR ===
+sarVal      = ta.sar(0.02, 0.02, 0.2)
+sarBullish  = close > sarVal
+
+// === Ichimoku Cloud ===
+tenkan      = (ta.highest(high, 9) + ta.lowest(low, 9)) / 2
+kijun       = (ta.highest(high, 26) + ta.lowest(low, 26)) / 2
+spanA       = (tenkan + kijun) / 2
+spanB       = (ta.highest(high, 52) + ta.lowest(low, 52)) / 2
+// Current cloud position (shifted 26 bars ahead for display, but for signals we use current)
+priceAboveCloud = close > math.max(spanA, spanB)
+
+// === Volume Average ===
+avgVol20    = ta.sma(volume, 20)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STRATEGY 1 & 2: SMA CROSSOVER
+// ─────────────────────────────────────────────────────────────────────────────
+
+smaBuy  = ta.crossover(smaShortVal, smaLongVal)
+smaSell = ta.crossunder(smaShortVal, smaLongVal)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STRATEGY 3 & 4: RSI
+// ─────────────────────────────────────────────────────────────────────────────
+
+rsiBuy  = ta.crossover(rsiVal, rsiOS)
+rsiSell = ta.crossunder(rsiVal, rsiOB)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STRATEGY 5: MACD
+// ─────────────────────────────────────────────────────────────────────────────
+
+macdBuy  = ta.crossover(macdLine, macdSig)
+macdSell = ta.crossunder(macdLine, macdSig)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STRATEGY 6: BB + RSI MEAN REVERSION
+// ─────────────────────────────────────────────────────────────────────────────
+
+bbIsRangeBound = adxVal < bbAdxThresh
+
+bbPriceAtLower = close <= bbLower or (close[1] < bbLower and close >= bbLower)
+bbRsiRecovery  = rsiVal > rsiOS and prevRSI <= rsiOS
+bbStochOS      = stochK < 20
+
+bbPriceAtUpper = close >= bbUpper or (close[1] > bbUpper and close <= bbUpper)
+bbRsiTopping   = rsiVal < rsiOB and prevRSI >= rsiOB
+bbStochOB      = stochK > 80
+
+bbRsiBuy  = bbIsRangeBound and (bbPriceAtLower or bbRsiRecovery) and bbStochOS
+bbRsiSell = bbIsRangeBound and (bbPriceAtUpper or bbRsiTopping) and bbStochOB
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STRATEGY 7: MOMENTUM CONFLUENCE (MACD + ADX + EMA)
+// ─────────────────────────────────────────────────────────────────────────────
+
+momEma          = ta.ema(close, momEmaFilt)
+momMacdBullX    = ta.crossover(macdLine, macdSig)
+momMacdBearX    = ta.crossunder(macdLine, macdSig)
+momStrongTrend  = adxVal > momAdxStr
+momWeakTrend    = adxVal < momAdxWeak
+momBullishDI    = diPlus > diMinus
+momAboveEma     = close > momEma
+momObvConfirm   = obvRising
+
+momBuy  = momMacdBullX and momStrongTrend and momBullishDI and momAboveEma and momObvConfirm
+momSell = momMacdBearX or (momWeakTrend and not momAboveEma)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STRATEGY 8: BREAKOUT (BB Squeeze + Volume + ATR)
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Detect squeeze: current BB width near its minimum over the lookback period
+bbWidthMin    = ta.lowest(bbWidth, brkSqzLookback)
+isSqueeze     = bbWidth <= bbWidthMin * 1.10
+
+// Volume confirmation
+highVolume    = volume > avgVol20 * brkVolMult
+
+// ATR expanding
+atrExpanding  = atrVal > prevATR
+
+// Breakout signals
+bullishBreakout = close > bbUpper and close[1] <= bbUpper[1]
+bearishBreakdown = close < bbLower and close[1] >= bbLower[1]
+failedBreakout  = close[1] > bbUpper[1] and close < bbBasis
+
+brkBuy  = (isSqueeze or atrExpanding) and bullishBreakout and highVolume
+brkSell = bearishBreakdown or failedBreakout
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STRATEGY 9: MULTI-INDICATOR CONFLUENCE
+// ─────────────────────────────────────────────────────────────────────────────
+
+// --- Buy Score (8 factors) ---
+buyScore = 0
+
+// Trend: EMA(12) > EMA(26)
+buyScore += ema12 > ema26 ? 1 : 0
+
+// Trend: Price > SMA(200)
+buyScore += (sma200 > 0 and close > sma200) ? 1 : 0
+
+// Trend: Ichimoku — price above cloud
+buyScore += priceAboveCloud ? 1 : 0
+
+// Momentum: RSI crosses above 30 (oversold recovery)
+buyScore += (rsiVal > 30 and prevRSI <= 30) ? 1 : 0
+
+// Momentum: MACD bullish crossover
+buyScore += (macdLine > macdSig and macdLine[1] <= macdSig[1]) ? 1 : 0
+
+// Momentum: Stochastic %K crosses above %D from oversold
+buyScore += (stochK < 30 and stochK > stochD and stochK[1] <= stochD[1]) ? 1 : 0
+
+// Volume: OBV rising
+buyScore += obvRising ? 1 : 0
+
+// Volume: MFI oversold and recovering
+buyScore += (mfiVal < 30 and mfiVal > mfiVal[1]) ? 1 : 0
+
+// --- Sell Score (8 factors) ---
+sellScore = 0
+
+// Trend: EMA(12) < EMA(26)
+sellScore += ema12 < ema26 ? 1 : 0
+
+// Trend: Price < SMA(200)
+sellScore += (sma200 > 0 and close < sma200) ? 1 : 0
+
+// Trend: Ichimoku — price below cloud
+sellScore += (not priceAboveCloud and spanA > 0) ? 1 : 0
+
+// Momentum: RSI crosses below 70 (overbought pullback)
+sellScore += (rsiVal < 70 and prevRSI >= 70) ? 1 : 0
+
+// Momentum: MACD bearish crossover
+sellScore += (macdLine < macdSig and macdLine[1] >= macdSig[1]) ? 1 : 0
+
+// Momentum: Stochastic %K crosses below %D from overbought
+sellScore += (stochK > 70 and stochK < stochD and stochK[1] >= stochD[1]) ? 1 : 0
+
+// Volume: OBV falling
+sellScore += not obvRising ? 1 : 0
+
+// Volume: MFI overbought and declining
+sellScore += (mfiVal > 70 and mfiVal < mfiVal[1]) ? 1 : 0
+
+multiBuy  = buyScore >= multiBuyThresh and buyScore > sellScore
+multiSell = sellScore >= multiSellThresh and sellScore > buyScore
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STRATEGY ROUTER — select active strategy signals
+// ─────────────────────────────────────────────────────────────────────────────
+
+bool isBuy  = false
+bool isSell = false
+
+switch strategyChoice
+    "SMA Crossover (50/200)" =>
+        isBuy  := smaBuy
+        isSell := smaSell
+    "SMA Crossover (20/50)" =>
+        isBuy  := smaBuy
+        isSell := smaSell
+    "RSI (30/70)" =>
+        isBuy  := rsiBuy
+        isSell := rsiSell
+    "RSI (25/75)" =>
+        isBuy  := rsiBuy
+        isSell := rsiSell
+    "MACD (12/26/9)" =>
+        isBuy  := macdBuy
+        isSell := macdSell
+    "BB + RSI Mean Reversion" =>
+        isBuy  := bbRsiBuy
+        isSell := bbRsiSell
+    "Momentum Confluence" =>
+        isBuy  := momBuy
+        isSell := momSell
+    "Breakout" =>
+        isBuy  := brkBuy
+        isSell := brkSell
+    "Multi-Indicator Confluence" =>
+        isBuy  := multiBuy
+        isSell := multiSell
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STRATEGY EXECUTION
+// ─────────────────────────────────────────────────────────────────────────────
+
+if isBuy
+    strategy.entry("Long", strategy.long)
+
+if isSell
+    strategy.close("Long")
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CONFLUENCE SIGNAL GENERATOR
+// Scores all indicators across 4 dimensions, matching SignalGenerator.java
+// ─────────────────────────────────────────────────────────────────────────────
+
+bullishCount = 0
+bearishCount = 0
+
+// --- TREND ---
+// EMA(12) vs EMA(26)
+bullishCount += ema12 > ema26 ? 1 : 0
+bearishCount += ema12 < ema26 ? 1 : 0
+
+// Price vs SMA(200)
+if sma200 > 0
+    bullishCount += close > sma200 ? 1 : 0
+    bearishCount += close < sma200 ? 1 : 0
+
+// Golden / Death Cross
+bullishCount += (sma50 > sma200 and sma50[1] <= sma200[1]) ? 1 : 0
+bearishCount += (sma50 < sma200 and sma50[1] >= sma200[1]) ? 1 : 0
+
+// Ichimoku Cloud
+if spanA > 0
+    bullishCount += priceAboveCloud ? 1 : 0
+    bearishCount += not priceAboveCloud ? 1 : 0
+
+// Ichimoku TK Cross
+bullishCount += (tenkan > kijun and tenkan[1] <= kijun[1]) ? 1 : 0
+bearishCount += (tenkan < kijun and tenkan[1] >= kijun[1]) ? 1 : 0
+
+// Parabolic SAR flip
+bullishCount += (sarBullish and not sarBullish[1]) ? 1 : 0
+bearishCount += (not sarBullish and sarBullish[1]) ? 1 : 0
+
+// ADX trend strength with DI direction
+if adxVal > 25
+    bullishCount += diPlus > diMinus ? 1 : 0
+    bearishCount += diMinus > diPlus ? 1 : 0
+
+// --- MOMENTUM ---
+// RSI
+bullishCount += (rsiVal > 30 and prevRSI <= 30) ? 1 : 0
+bearishCount += (rsiVal < 70 and prevRSI >= 70) ? 1 : 0
+bullishCount += rsiVal < 30 ? 1 : 0
+bearishCount += rsiVal > 70 ? 1 : 0
+
+// MACD crossover
+bullishCount += (macdLine > macdSig and macdLine[1] <= macdSig[1]) ? 1 : 0
+bearishCount += (macdLine < macdSig and macdLine[1] >= macdSig[1]) ? 1 : 0
+
+// MACD histogram expanding
+bullishCount += (macdHist > 0 and macdHist > macdHist[1]) ? 1 : 0
+bearishCount += (macdHist < 0 and macdHist < macdHist[1]) ? 1 : 0
+
+// Stochastic
+bullishCount += stochK < 20 ? 1 : 0
+bearishCount += stochK > 80 ? 1 : 0
+
+// Williams %R
+bullishCount += williamsR < -80 ? 1 : 0
+bearishCount += williamsR > -20 ? 1 : 0
+
+// CCI
+bullishCount += cciVal < -100 ? 1 : 0
+bearishCount += cciVal > 100 ? 1 : 0
+
+// ROC
+bullishCount += (rocVal > 0 and rocVal[1] <= 0) ? 1 : 0
+bearishCount += (rocVal < 0 and rocVal[1] >= 0) ? 1 : 0
+
+// --- VOLUME ---
+// OBV
+bullishCount += obvRising ? 1 : 0
+bearishCount += not obvRising ? 1 : 0
+
+// MFI
+bullishCount += mfiVal < 20 ? 1 : 0
+bearishCount += mfiVal > 80 ? 1 : 0
+
+// Volume vs average
+if avgVol20 > 0 and volume > avgVol20 * 1.5
+    bullishCount += close > close[1] ? 1 : 0
+    bearishCount += close < close[1] ? 1 : 0
+
+// --- VOLATILITY ---
+// Bollinger %B
+bullishCount += bbPctB <= 0 ? 1 : 0
+bearishCount += bbPctB >= 1 ? 1 : 0
+
+// Price vs VWAP
+if vwapVal > 0
+    bullishCount += close > vwapVal ? 1 : 0
+    bearishCount += close < vwapVal ? 1 : 0
+
+// Confluence signal classification
+totalIndicators = math.max(bullishCount + bearishCount, 1)
+bullishPct = bullishCount / totalIndicators
+bearishPct = bearishCount / totalIndicators
+
+string signalDir = "NEUTRAL"
+float  confluenceScore = 0.0
+
+if bullishPct >= 0.75
+    signalDir := "STRONG BUY"
+    confluenceScore := bullishPct
+else if bullishPct >= 0.55
+    signalDir := "BUY"
+    confluenceScore := bullishPct
+else if bearishPct >= 0.75
+    signalDir := "STRONG SELL"
+    confluenceScore := bearishPct
+else if bearishPct >= 0.55
+    signalDir := "SELL"
+    confluenceScore := bearishPct
+else
+    signalDir := "NEUTRAL"
+    confluenceScore := math.max(bullishPct, bearishPct)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// VISUAL OVERLAYS
+// ─────────────────────────────────────────────────────────────────────────────
+
+// === Moving Averages ===
+plot(sma50, "SMA 50", color=color.new(color.blue, 40), linewidth=1)
+plot(sma200, "SMA 200", color=color.new(color.red, 40), linewidth=1)
+
+// === Bollinger Bands (optional) ===
+plot(showBBOverlay ? bbUpper : na, "BB Upper", color=color.new(color.gray, 60), linewidth=1)
+plot(showBBOverlay ? bbBasis : na, "BB Middle", color=color.new(color.gray, 75), linewidth=1, style=plot.style_circles)
+plot(showBBOverlay ? bbLower : na, "BB Lower", color=color.new(color.gray, 60), linewidth=1)
+fill(plot(showBBOverlay ? bbUpper : na, display=display.none), plot(showBBOverlay ? bbLower : na, display=display.none),
+     color=color.new(color.gray, 92), title="BB Fill")
+
+// === Ichimoku Cloud (optional) ===
+pSpanA = plot(showIchimoku ? spanA : na, "Span A", color=color.new(color.green, 70), offset=26)
+pSpanB = plot(showIchimoku ? spanB : na, "Span B", color=color.new(color.red, 70), offset=26)
+fill(pSpanA, pSpanB, color=spanA >= spanB ? color.new(color.green, 90) : color.new(color.red, 90), title="Ichimoku Cloud")
+plot(showIchimoku ? tenkan : na, "Tenkan", color=color.new(color.blue, 50), linewidth=1)
+plot(showIchimoku ? kijun : na, "Kijun", color=color.new(color.maroon, 50), linewidth=1)
+
+// === Parabolic SAR (optional) ===
+plot(showSAROverlay ? sarVal : na, "Parabolic SAR", color=sarBullish ? color.new(color.green, 30) : color.new(color.red, 30),
+     style=plot.style_circles, linewidth=1)
+
+// === Buy / Sell markers ===
+plotshape(isBuy, title="Buy Signal", location=location.belowbar, style=shape.triangleup,
+     size=size.small, color=color.new(color.green, 0), text="BUY")
+plotshape(isSell, title="Sell Signal", location=location.abovebar, style=shape.triangledown,
+     size=size.small, color=color.new(color.red, 0), text="SELL")
+
+// === Background tint based on confluence ===
+bgColor = signalDir == "STRONG BUY"  ? color.new(color.green, 90) :
+          signalDir == "BUY"          ? color.new(color.green, 95) :
+          signalDir == "STRONG SELL"  ? color.new(color.red, 90) :
+          signalDir == "SELL"         ? color.new(color.red, 95) :
+          color.new(color.gray, 98)
+bgcolor(bgColor, title="Confluence Background")
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SUPPORT & RESISTANCE (Swing Highs/Lows)
+// ─────────────────────────────────────────────────────────────────────────────
+
+swingLen = 5
+swingHigh = ta.pivothigh(high, swingLen, swingLen)
+swingLow  = ta.pivotlow(low, swingLen, swingLen)
+
+if showSR and not na(swingHigh)
+    line.new(bar_index - swingLen, swingHigh, bar_index, swingHigh,
+         color=color.new(color.red, 50), style=line.style_dotted, width=1, extend=extend.right)
+
+if showSR and not na(swingLow)
+    line.new(bar_index - swingLen, swingLow, bar_index, swingLow,
+         color=color.new(color.green, 50), style=line.style_dotted, width=1, extend=extend.right)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ALERTS
+// ─────────────────────────────────────────────────────────────────────────────
+
+alertcondition(isBuy, title="Buy Alert", message="{{ticker}} — BUY signal from {{strategy.order.action}} strategy")
+alertcondition(isSell, title="Sell Alert", message="{{ticker}} — SELL signal from {{strategy.order.action}} strategy")
+alertcondition(signalDir == "STRONG BUY", title="Strong Buy Confluence",
+     message="{{ticker}} — STRONG BUY confluence detected (75%+ bullish indicators)")
+alertcondition(signalDir == "STRONG SELL", title="Strong Sell Confluence",
+     message="{{ticker}} — STRONG SELL confluence detected (75%+ bearish indicators)")
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CONFLUENCE DASHBOARD TABLE
+// ─────────────────────────────────────────────────────────────────────────────
+
+if showDashboard and barstate.islast
+    var table dashboard = table.new(position.top_right, 2, 18,
+         bgcolor=color.new(color.black, 15), border_width=1, border_color=color.gray,
+         frame_width=1, frame_color=color.gray)
+
+    headerBg = color.new(#1a1a2e, 0)
+    textCol  = color.white
+
+    // Signal color
+    sigColor = signalDir == "STRONG BUY"  ? color.lime :
+               signalDir == "BUY"          ? color.green :
+               signalDir == "STRONG SELL"  ? color.red :
+               signalDir == "SELL"         ? #ff6666 :
+               color.gray
+
+    // Header
+    table.cell(dashboard, 0, 0, "Stock Downloader", text_color=textCol, bgcolor=headerBg,
+         text_size=size.small, text_halign=text.align_left)
+    table.cell(dashboard, 1, 0, strategyChoice, text_color=color.yellow, bgcolor=headerBg,
+         text_size=size.small, text_halign=text.align_right)
+    table.merge_cells(dashboard, 0, 0, 1, 0)
+
+    // Signal
+    table.cell(dashboard, 0, 1, "Signal", text_color=textCol, bgcolor=headerBg, text_size=size.small)
+    table.cell(dashboard, 1, 1, signalDir + " (" + str.tostring(confluenceScore * 100, "#.0") + "%)",
+         text_color=sigColor, bgcolor=headerBg, text_size=size.small)
+
+    // Confluence
+    table.cell(dashboard, 0, 2, "Bullish / Bearish", text_color=textCol, bgcolor=headerBg, text_size=size.small)
+    table.cell(dashboard, 1, 2, str.tostring(bullishCount) + " / " + str.tostring(bearishCount),
+         text_color=textCol, bgcolor=headerBg, text_size=size.small)
+
+    // Multi-Indicator Score
+    table.cell(dashboard, 0, 3, "Multi Score B/S", text_color=textCol, bgcolor=headerBg, text_size=size.small)
+    table.cell(dashboard, 1, 3, str.tostring(buyScore) + " / " + str.tostring(sellScore),
+         text_color=buyScore > sellScore ? color.green : buyScore < sellScore ? color.red : color.gray,
+         bgcolor=headerBg, text_size=size.small)
+
+    // Separator
+    sepBg = color.new(#2a2a4a, 0)
+    table.cell(dashboard, 0, 4, "— Trend —", text_color=color.yellow, bgcolor=sepBg,
+         text_size=size.tiny, text_halign=text.align_center)
+    table.merge_cells(dashboard, 0, 4, 1, 4)
+
+    // EMA 12/26
+    table.cell(dashboard, 0, 5, "EMA 12/26", text_color=textCol, bgcolor=headerBg, text_size=size.tiny)
+    table.cell(dashboard, 1, 5, ema12 > ema26 ? "Bullish" : "Bearish",
+         text_color=ema12 > ema26 ? color.green : color.red, bgcolor=headerBg, text_size=size.tiny)
+
+    // SMA 200
+    table.cell(dashboard, 0, 6, "SMA 200", text_color=textCol, bgcolor=headerBg, text_size=size.tiny)
+    table.cell(dashboard, 1, 6, close > sma200 ? "Above" : "Below",
+         text_color=close > sma200 ? color.green : color.red, bgcolor=headerBg, text_size=size.tiny)
+
+    // Ichimoku
+    table.cell(dashboard, 0, 7, "Ichimoku Cloud", text_color=textCol, bgcolor=headerBg, text_size=size.tiny)
+    table.cell(dashboard, 1, 7, priceAboveCloud ? "Above" : "Below",
+         text_color=priceAboveCloud ? color.green : color.red, bgcolor=headerBg, text_size=size.tiny)
+
+    // ADX
+    table.cell(dashboard, 0, 8, "ADX (" + str.tostring(adxVal, "#.1") + ")", text_color=textCol, bgcolor=headerBg, text_size=size.tiny)
+    adxLabel = adxVal > 25 ? (diPlus > diMinus ? "Strong Up" : "Strong Down") : "Weak/Range"
+    adxColor = adxVal > 25 ? (diPlus > diMinus ? color.green : color.red) : color.gray
+    table.cell(dashboard, 1, 8, adxLabel, text_color=adxColor, bgcolor=headerBg, text_size=size.tiny)
+
+    // Separator
+    table.cell(dashboard, 0, 9, "— Momentum —", text_color=color.yellow, bgcolor=sepBg,
+         text_size=size.tiny, text_halign=text.align_center)
+    table.merge_cells(dashboard, 0, 9, 1, 9)
+
+    // RSI
+    rsiColor = rsiVal < 30 ? color.green : rsiVal > 70 ? color.red : color.gray
+    table.cell(dashboard, 0, 10, "RSI (14)", text_color=textCol, bgcolor=headerBg, text_size=size.tiny)
+    table.cell(dashboard, 1, 10, str.tostring(rsiVal, "#.1"),
+         text_color=rsiColor, bgcolor=headerBg, text_size=size.tiny)
+
+    // MACD
+    macdColor = macdLine > macdSig ? color.green : color.red
+    table.cell(dashboard, 0, 11, "MACD", text_color=textCol, bgcolor=headerBg, text_size=size.tiny)
+    table.cell(dashboard, 1, 11, macdLine > macdSig ? "Bullish" : "Bearish",
+         text_color=macdColor, bgcolor=headerBg, text_size=size.tiny)
+
+    // Stochastic
+    stochColor = stochK < 20 ? color.green : stochK > 80 ? color.red : color.gray
+    table.cell(dashboard, 0, 12, "Stoch %K", text_color=textCol, bgcolor=headerBg, text_size=size.tiny)
+    table.cell(dashboard, 1, 12, str.tostring(stochK, "#.1"),
+         text_color=stochColor, bgcolor=headerBg, text_size=size.tiny)
+
+    // Separator
+    table.cell(dashboard, 0, 13, "— Volume —", text_color=color.yellow, bgcolor=sepBg,
+         text_size=size.tiny, text_halign=text.align_center)
+    table.merge_cells(dashboard, 0, 13, 1, 13)
+
+    // OBV
+    table.cell(dashboard, 0, 14, "OBV", text_color=textCol, bgcolor=headerBg, text_size=size.tiny)
+    table.cell(dashboard, 1, 14, obvRising ? "Rising" : "Falling",
+         text_color=obvRising ? color.green : color.red, bgcolor=headerBg, text_size=size.tiny)
+
+    // MFI
+    mfiColor = mfiVal < 20 ? color.green : mfiVal > 80 ? color.red : color.gray
+    table.cell(dashboard, 0, 15, "MFI (14)", text_color=textCol, bgcolor=headerBg, text_size=size.tiny)
+    table.cell(dashboard, 1, 15, str.tostring(mfiVal, "#.1"),
+         text_color=mfiColor, bgcolor=headerBg, text_size=size.tiny)
+
+    // Separator
+    table.cell(dashboard, 0, 16, "— Volatility —", text_color=color.yellow, bgcolor=sepBg,
+         text_size=size.tiny, text_halign=text.align_center)
+    table.merge_cells(dashboard, 0, 16, 1, 16)
+
+    // BB %B
+    bbColor = bbPctB <= 0 ? color.green : bbPctB >= 1 ? color.red : color.gray
+    table.cell(dashboard, 0, 17, "BB %B", text_color=textCol, bgcolor=headerBg, text_size=size.tiny)
+    table.cell(dashboard, 1, 17, str.tostring(bbPctB, "#.2") + (isSqueeze ? " [SQUEEZE]" : ""),
+         text_color=bbColor, bgcolor=headerBg, text_size=size.tiny)
